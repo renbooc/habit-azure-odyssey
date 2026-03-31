@@ -1,0 +1,339 @@
+import React, { useEffect, useState } from 'react';
+import { Card } from '@/src/components/ui/Card';
+import { Flame, Droplets, Leaf, Check, Bed, BookOpen, Puzzle, Palette, Play, Pause, X, CheckCircle2, Circle, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/src/lib/utils';
+import confetti from 'canvas-confetti';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TrendingUp } from 'lucide-react';
+import { useUser } from '@/src/context/UserContext';
+
+export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string) => void }) => {
+  const { refreshPoints } = useUser();
+  const [stats, setStats] = useState<any>({
+    level: 1,
+    streak_days: 0,
+    plants_count: 0,
+    water_drops: 0,
+    points: 0,
+    quick_tasks: []
+  });
+  const [history, setHistory] = useState<any[]>([]);
+  const [activeTimer, setActiveTimer] = useState<{ id: string, title: string, remaining: number, isPaused: boolean } | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/child`);
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (err) {
+        console.error('获取孩子统计数据失败', err);
+      }
+    };
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/history`);
+        if (res.ok) {
+          const data = await res.json();
+          // 确保返回的是数组
+          if (Array.isArray(data)) {
+            setHistory(data);
+          } else {
+            console.warn('History API returned non-array:', data);
+          }
+        }
+      } catch (err) {
+        console.error('获取历史统计数据失败', err);
+      }
+    };
+    fetchStats();
+    fetchHistory();
+  }, []);
+
+  const triggerConfetti = () => {
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#22d3ee', '#818cf8', '#f472b6']
+    });
+  };
+
+  useEffect(() => {
+    if (!activeTimer || activeTimer.isPaused) return;
+    const timer = setInterval(() => {
+      setActiveTimer(prev => {
+        if (!prev) return null;
+        if (prev.remaining <= 0) return prev;
+        return { ...prev, remaining: prev.remaining - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [activeTimer?.isPaused, activeTimer?.id]);
+
+  useEffect(() => {
+    if (activeTimer && activeTimer.remaining === 0) {
+      handleToggleTask(activeTimer.id);
+      setActiveTimer(null);
+    }
+  }, [activeTimer?.remaining]);
+
+  const handleToggleTask = async (taskId: string) => {
+    try {
+      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: true })
+      });
+      if (res.ok) {
+        triggerConfetti();
+        refreshPoints();
+        const taskObj = stats.quick_tasks.find((t: any) => t.id === taskId);
+        const earned = taskObj?.points || 10;
+        // Refresh local state to remove completed task
+        setStats((prev: any) => ({
+          ...prev,
+          quick_tasks: prev.quick_tasks.filter((t: any) => t.id !== taskId),
+          points: prev.points + earned,
+          water_drops: prev.water_drops + earned
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to update task', err);
+    }
+  };
+
+  return (
+    <div className="space-y-8 pb-32">
+      {/* Immersive Timer Modal */}
+      <AnimatePresence>
+        {activeTimer && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-3xl flex flex-col items-center justify-center text-white p-6"
+          >
+            <button onClick={() => setActiveTimer(null)} className="absolute top-8 left-8 p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+              <X size={24} />
+            </button>
+            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="flex flex-col items-center">
+              <p className="text-white/60 text-lg font-bold tracking-widest uppercase mb-4">专注进行中</p>
+              <h2 className="text-3xl font-black mb-12 max-w-[80vw] text-center leading-snug">{activeTimer.title}</h2>
+              <div className="relative w-64 h-64 flex items-center justify-center mb-16">
+                <div className="text-8xl font-black tabular-nums tracking-tighter shadow-white/10">
+                  {Math.floor(activeTimer.remaining / 60).toString().padStart(2, '0')}:{(activeTimer.remaining % 60).toString().padStart(2, '0')}
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTimer({ ...activeTimer, isPaused: !activeTimer.isPaused })}
+                className={cn("w-24 h-24 rounded-full flex items-center justify-center transition-all", activeTimer.isPaused ? "bg-primary text-white scale-110 shadow-lg shadow-primary/50" : "bg-white/20 text-white")}
+              >
+                {activeTimer.isPaused ? <Play size={40} className="ml-2" /> : <Pause size={40} />}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Hero Section */}
+      <section className="relative aspect-video rounded-xl overflow-hidden shadow-ambient bg-primary-container/10 group">
+        <img
+          src="https://picsum.photos/seed/sky-garden/800/450"
+          alt="Sky Garden"
+          className="absolute inset-0 w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
+        <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end text-white">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-secondary rounded-full text-[10px] font-bold tracking-widest uppercase">等级 {stats.level}</span>
+              <div className="flex items-center text-secondary-container">
+                <Flame size={14} className="fill-current" />
+                <span className="text-xs font-bold">{stats.streak_days} 天连击</span>
+              </div>
+            </div>
+            <p className="text-2xl font-bold">天空探险家</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <motion.div
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer shadow-lg"
+            >
+              <Droplets size={30} className="fill-white" />
+            </motion.div>
+            <span className="text-[10px] font-bold">成长点滴</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="flex flex-col items-center text-center p-6">
+          <div className="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center mb-3">
+            <Leaf size={24} className="text-secondary fill-current" />
+          </div>
+          <span className="text-[12px] font-semibold text-on-surface-variant/60 mb-1">已种植物</span>
+          <span className="text-2xl font-bold text-on-surface">{stats.plants_count}</span>
+        </Card>
+        <Card className="flex flex-col items-center text-center p-6">
+          <div className="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center mb-3">
+            <Droplets size={24} className="text-primary fill-current" />
+          </div>
+          <span className="text-[12px] font-semibold text-on-surface-variant/60 mb-1">水滴数 / 积分</span>
+          <span className="text-2xl font-bold text-on-surface">{stats.water_drops}</span>
+        </Card>
+      </div>
+
+      {/* Weekly Growth Chart */}
+      <Card className="p-6 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <TrendingUp size={22} />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-on-surface">专注力能量周报</h3>
+              <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-tight">每日专注时长 (分钟)</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-2xl font-black text-primary">
+              {Array.isArray(history) ? history.reduce((acc, curr) => acc + (curr.minutes || 0), 0) : 0}
+            </span>
+            <span className="text-[10px] font-black text-on-surface-variant/40 block">本周总分钟</span>
+          </div>
+        </div>
+
+        <div className="h-40 w-full mt-4 -ml-4">
+          <ResponsiveContainer width="105%" height="100%">
+            <BarChart data={Array.isArray(history) ? history : []}>
+              <XAxis
+                dataKey="date"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                dy={10}
+              />
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-surface p-2 rounded-lg shadow-xl border border-outline-variant/30 text-[10px] font-bold">
+                        <p className="text-primary">{payload[0].value} 分钟</p>
+                        <p className="text-on-surface-variant/60">{payload[0].payload.count} 个任务</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="minutes" radius={[4, 4, 4, 4]} barSize={18}>
+                {history.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.minutes > 0 ? '#6366f1' : '#f1f5f9'}
+                    fillOpacity={index === history.length - 1 ? 1 : 0.6}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+      {/* Quick Actions */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold text-on-surface px-2">快速开始</h2>
+        <div className="grid grid-cols-2 gap-4">
+          {stats.quick_tasks && stats.quick_tasks.length > 0 ? (
+            stats.quick_tasks.map((task: any, i: number) => {
+              const icons = {
+                'BookOpen': BookOpen,
+                'Bed': Bed,
+                'Check': Check,
+                'Puzzle': Puzzle,
+                'Leaf': Leaf,
+                'Droplets': Droplets
+              } as const;
+              const IconComponent = icons[task.icon as keyof typeof icons] || Check;
+              return (
+                <Card
+                  key={task.id || i}
+                  className="p-6 bg-secondary-container/20 border border-secondary/10 flex flex-col items-center gap-3 relative group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center relative overflow-hidden">
+                    {task.task_type === 'timer' ? (
+                      <button
+                        onClick={() => setActiveTimer({ id: task.id, title: task.title, remaining: (task.target_duration || 30) * 60, isPaused: false })}
+                        className="absolute inset-0 bg-primary flex items-center justify-center hover:scale-110 transition-transform"
+                      >
+                        <Play size={24} className="ml-1" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleTask(task.id)}
+                        className="absolute inset-0 bg-secondary flex items-center justify-center hover:scale-110 transition-transform"
+                      >
+                        <IconComponent size={24} />
+                      </button>
+                    )}
+                  </div>
+                  <span className="font-bold text-sm text-center line-clamp-1" title={task.title}>{task.title}</span>
+                  {task.task_type === 'timer' && (
+                    <span className="text-[10px] font-black text-primary/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                      ⏱️ {task.target_duration} MIN
+                    </span>
+                  )}
+                </Card>
+              );
+            })
+          ) : (
+            <div className="col-span-2 text-center text-on-surface-variant/60 py-4 text-sm bg-surface-container-low rounded-xl">
+              太棒了！你目前没有未完成的任务 🎉
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Streak Celebration */}
+      <section className="primary-gradient p-6 rounded-xl shadow-lg shadow-primary/20 text-white relative overflow-hidden">
+        <div className="relative z-10 flex items-center gap-6">
+          <div className="flex-shrink-0 w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border-4 border-white/30 shadow-inner">
+            <span className="text-4xl drop-shadow-md">🔥</span>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold leading-tight drop-shadow-sm">你太棒了！</h2>
+            <p className="text-white/90 text-sm mt-1">
+              {stats.streak_days > 0
+                ? `连续 ${stats.streak_days} 天坚持好习惯。继续加油！`
+                : '今天是培养好习惯的第一天，开始行动吧！'}
+            </p>
+
+            {/* Visual Progress Bar */}
+            <div className="mt-4 space-y-2">
+              <div className="w-full bg-black/20 rounded-full h-3 overflow-hidden backdrop-blur-sm border border-white/10 shadow-inner">
+                <div
+                  className="bg-white h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
+                  style={{ width: `${Math.min(100, (stats.streak_days / (Math.ceil((stats.streak_days + 0.1) / 7) * 7 || 7)) * 100)}%` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
+                </div>
+              </div>
+              <div className="flex justify-between text-xs font-bold text-white/90 px-1">
+                <span>当前: {stats.streak_days} 天</span>
+                <span>目标: {Math.ceil((stats.streak_days + 0.1) / 7) * 7 || 7} 天</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-secondary/30 rounded-full blur-2xl pointer-events-none" />
+      </section>
+    </div>
+  );
+};
