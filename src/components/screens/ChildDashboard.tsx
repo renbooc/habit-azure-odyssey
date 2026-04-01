@@ -21,6 +21,25 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   });
   const [history, setHistory] = useState<any[]>([]);
   const [activeTimer, setActiveTimer] = useState<{ id: string, title: string, remaining: number, isPaused: boolean } | null>(null);
+  const [quote, setQuote] = useState<string | null>(null);
+
+  const QUOTES = [
+    "你今天的能量值爆表，像深海巨鲸一样无可阻挡！🐋",
+    "深蓝海洋见证了你的每一份努力，继续加油！🌊",
+    "你是这片海域最勤奋的探险家，宝藏就在前方！💎",
+    "像潮汐一样持之以恒，终将汇聚成伟大的力量！🛶",
+    "你的光芒正在照亮最深邃的海沟，太棒了！✨",
+    "海浪虽然起伏，但坚定的船长从不返航，冲鸭！🚢",
+    "由于你的坚持，这片海洋花园正在悄悄绽放！🌿",
+    "每一次打卡，都是在为你的梦想海洋注入淡水！💧"
+  ];
+
+  const showRandomQuote = () => {
+    const randomIdx = Math.floor(Math.random() * QUOTES.length);
+    setQuote(QUOTES[randomIdx]);
+    // 3秒后自动消失
+    setTimeout(() => setQuote(null), 3000);
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -160,11 +179,25 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
             </div>
             <p className="text-2xl font-bold">{stats.level_title || '天空探险家'}</p>
           </div>
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2 relative">
+            <AnimatePresence>
+              {quote && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                  animate={{ opacity: 1, y: -60, scale: 1 }}
+                  exit={{ opacity: 0, y: -100, scale: 0.8 }}
+                  className="absolute z-50 bg-white/95 backdrop-blur-xl text-primary p-4 rounded-2xl shadow-2xl border border-white/50 w-48 text-center"
+                >
+                  <p className="text-[11px] font-black leading-tight drop-shadow-sm">{quote}</p>
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/95 rotate-45" />
+                </motion.div>
+              )}
+            </AnimatePresence>
             <motion.div
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer shadow-lg"
+              onClick={showRandomQuote}
+              className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer shadow-lg active:bg-white/40"
             >
               <Droplets size={30} className="fill-white" />
             </motion.div>
