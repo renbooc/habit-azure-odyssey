@@ -22,6 +22,18 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   const [history, setHistory] = useState<any[]>([]);
   const [activeTimer, setActiveTimer] = useState<{ id: string, title: string, remaining: number, isPaused: boolean } | null>(null);
   const [quote, setQuote] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<string>("https://images.unsplash.com/photo-1517030330234-94c4fa9fc8ce?auto=format&fit=crop&w=800&q=80");
+
+  const HERO_IMAGES = [
+    "https://images.unsplash.com/photo-1517030330234-94c4fa9fc8ce", // 帆船
+    "https://images.unsplash.com/photo-1505118380757-91f5f47d8ad0", // 珊瑚礁
+    "https://images.unsplash.com/photo-1459213599465-03ad6f4739fb", // 深蓝海面
+    "https://images.unsplash.com/photo-1464929857451-446960098022", // 黄昏海岸
+    "https://images.unsplash.com/photo-1516053353268-40381ed3e445", // 海底世界
+    "https://images.unsplash.com/photo-1466611653911-95282fc3656b", // 海上灯塔
+    "https://images.unsplash.com/photo-1473679408190-0693dd22fe6a", // 蓝洞
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"  // 热带沙滩
+  ];
 
   const QUOTES = [
     "你今天的能量值爆表，像深海巨鲸一样无可阻挡！🐋",
@@ -37,9 +49,14 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   const showRandomQuote = () => {
     const randomIdx = Math.floor(Math.random() * QUOTES.length);
     setQuote(QUOTES[randomIdx]);
-    // 3秒后自动消失
     setTimeout(() => setQuote(null), 3000);
   };
+
+  useEffect(() => {
+    // 随机选择背景图
+    const randomBg = HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)];
+    setBgImage(`${randomBg}?auto=format&fit=crop&w=800&q=80`);
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -159,9 +176,13 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
 
       {/* Hero Section */}
       <section className="relative aspect-video rounded-xl overflow-hidden shadow-ambient bg-primary-container/10 group">
-        <img
-          src="https://picsum.photos/seed/sky-garden/800/450"
-          alt="Sky Garden"
+        <motion.img
+          key={bgImage}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+          src={bgImage}
+          alt="Ocean Odyssey"
           className="absolute inset-0 w-full h-full object-cover"
           referrerPolicy="no-referrer"
         />
