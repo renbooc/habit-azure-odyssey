@@ -1,9 +1,9 @@
-# 第一阶段：打包前端 (Node.js)
-FROM node:18 AS frontend-build
+# 第一阶段：打包前端 (使用 Node 20 提高兼容性)
+FROM node:20 AS frontend-build
 WORKDIR /app
-# 只拷贝 package.json，不拷贝 package-lock.json，强制全新解析 Linux 下的二进制包
+# 强制不使用缓存并全新解析
 COPY package.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY . .
 # 设置构建所需的环境变量 (让前端知道请求同域名的 /api)
 ENV VITE_API_BASE=/api
