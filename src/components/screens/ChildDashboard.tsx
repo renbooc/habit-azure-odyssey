@@ -150,13 +150,15 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
         <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end text-white">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-secondary rounded-full text-[10px] font-bold tracking-widest uppercase">等级 {stats.level}</span>
+              <span className="px-3 py-1 bg-secondary rounded-full text-[10px] font-bold tracking-widest uppercase">
+                {stats.level_emoji} 等级 {stats.level}
+              </span>
               <div className="flex items-center text-secondary-container">
                 <Flame size={14} className="fill-current" />
                 <span className="text-xs font-bold">{stats.streak_days} 天连击</span>
               </div>
             </div>
-            <p className="text-2xl font-bold">天空探险家</p>
+            <p className="text-2xl font-bold">{stats.level_title || '天空探险家'}</p>
           </div>
           <div className="flex flex-col items-center gap-2">
             <motion.div

@@ -4,38 +4,47 @@ from typing import Dict, Any, List
 
 router = APIRouter()
 
+def get_level_data(points: int) -> Dict[str, Any]:
+    """核心等级与称号联动算法"""
+    if points < 100:
+        return {"level": 1, "title": "海滩拾贝新手", "emoji": "🐚"}
+    elif points < 500:
+        return {"level": 2, "title": "浅海乘风船员", "emoji": "🚣"}
+    elif points < 1000:
+        return {"level": 3, "title": "深蓝潜航精英", "emoji": "🤿"}
+    elif points < 2000:
+        return {"level": 4, "title": "巨浪勇士先锋", "emoji": "🔱"}
+    elif points < 5000:
+        return {"level": 5, "title": "海洋荣耀提督", "emoji": "🚢"}
+    else:
+        return {"level": 6, "title": "永恒蔚蓝领主", "emoji": "👑"}
+
 @router.get("/child")
 def get_child_stats(family_id: str, username: str):
-    """获取指定家庭中特定用户的孩子端面板数据"""
+    """获取指定家庭中特定用户的子端面板数据 (注入动态称号)"""
     try:
-        # 只获取当前家庭中属于该用户的任务
         tasks_res = supabase.table("tasks").select("*").eq("family_id", family_id).eq("username", username).execute()
         tasks_data = tasks_res.data or []
-        
-        # 积分逻辑：统计该用户的完成情况
         completed_tasks = [t for t in tasks_data if t.get("completed")]
-        gross_points = 0
-        for t in completed_tasks:
-            p_val = t.get("points")
-            gross_points += int(p_val) if p_val is not None else 10
         
-        # 统计该用户的购买消耗
+        gross = sum(int(t.get("points", 10)) for t in completed_tasks)
         purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", username).execute()
-        spent_points = sum(p.get("price", 0) for p in (purchases_res.data or []))
+        spent = sum(p.get("price", 0) for p in (purchases_res.data or []))
+        points = max(0, gross - spent)
         
-        points = max(0, gross_points - spent_points)
+        # 应用动态等级系统
+        lvl_info = get_level_data(points)
         
-        # 获取该用户的未完成任务作为推荐
-        uncompleted_tasks = [t for t in tasks_data if not t.get("completed")]
-        quick_tasks = uncompleted_tasks[:2]
-        
+        uncompleted = [t for t in tasks_data if not t.get("completed")]
         return {
-            "level": points // 100 + 1,
+            "level": lvl_info["level"],
+            "level_title": lvl_info["title"],
+            "level_emoji": lvl_info["emoji"],
             "streak_days": 1, 
             "plants_count": len(completed_tasks),
             "water_drops": points,
             "points": points,
-            "quick_tasks": quick_tasks
+            "quick_tasks": uncompleted[:2]
         }
     except Exception as e:
         return {"error": str(e)}
@@ -44,7 +53,7 @@ def get_child_stats(family_id: str, username: str):
 def get_parent_stats(family_id: str):
     """获取指定家庭的家长端聚合数据"""
     try:
-        # 1. 家族最近完成的任务
+        # 1. 家族最近完成的任务 (按完成时间排序)
         recent_res = supabase.table("tasks")\
             .select("*")\
             .eq("completed", True)\
@@ -72,21 +81,19 @@ def get_parent_stats(family_id: str):
 
 @router.get("/history")
 def get_stats_history(family_id: str, username: str):
-    """获取指定用户过去 7 天的专注时长与完成量统计 (隔离模式)"""
+    """获取指定用户过去 7 天的统计 (隔离模式)"""
     from datetime import datetime, timedelta
     try:
         days_ago = datetime.now() - timedelta(days=7)
-        # 加上 username 过滤，实现历史数据隔离
-        query = supabase.table("tasks")\
+        tasks_res = supabase.table("tasks")\
             .select("completed_at, target_duration, task_type")\
             .eq("completed", True)\
             .eq("family_id", family_id)\
             .eq("username", username)\
-            .gte("completed_at", days_ago.isoformat())
+            .gte("completed_at", days_ago.isoformat())\
+            .execute()
         
-        tasks_res = query.execute()
         raw_data = tasks_res.data or []
-        
         history_map = {}
         for i in range(6, -1, -1):
             d_str = (datetime.now() - timedelta(days=i)).strftime("%m-%d")
@@ -109,34 +116,30 @@ def get_stats_history(family_id: str, username: str):
 
 @router.get("/leaderboard")
 def get_family_leaderboard(family_id: str):
-    """获取全家战力排行榜"""
+    """获取排行榜 (同步动态等级信息)"""
     try:
-        # 1. 获取全家用户
         users_res = supabase.table("users").select("username, role, avatar").eq("family_id", family_id).execute()
         all_users = users_res.data or []
-        
         leaderboard = []
         for user in all_users:
             uname = user["username"]
-            
-            # 2. 计算该用户的任务收益
             tasks_res = supabase.table("tasks").select("points").eq("family_id", family_id).eq("username", uname).eq("completed", True).execute()
             gross = sum(int(t.get("points", 10)) for t in (tasks_res.data or []))
-            
-            # 3. 计算该用户的商场消耗
             purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", uname).execute()
             spent = sum(int(p.get("price", 0)) for p in (purchases_res.data or []))
-            
             pts = max(0, gross - spent)
+            
+            # 使用统一等级算法
+            lvl_info = get_level_data(pts)
+            
             leaderboard.append({
                 "username": uname,
                 "role": user["role"],
                 "avatar": user.get("avatar"),
                 "points": pts,
-                "level": pts // 100 + 1
+                "level": lvl_info["level"],
+                "level_title": lvl_info["title"]
             })
-            
-        # 按积分从高到低排序
         leaderboard.sort(key=lambda x: x["points"], reverse=True)
         return leaderboard
     except Exception as e:

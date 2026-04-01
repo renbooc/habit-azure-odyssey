@@ -219,7 +219,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
                     <span className="font-bold text-on-surface tracking-tight">{player.username}</span>
                     {player.role === 'parent' && <span className="text-[10px] bg-primary/20 text-primary px-1.5 rounded font-black">家长</span>}
                   </div>
-                  <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">等级 {player.level} 探险家</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">{player.level_title || `等级 ${player.level} 探险家`}</span>
                 </div>
               </div>
               <div className="text-right">
