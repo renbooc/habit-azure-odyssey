@@ -184,12 +184,12 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
               {quote && (
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.8 }}
-                  animate={{ opacity: 1, y: -60, scale: 1 }}
-                  exit={{ opacity: 0, y: -100, scale: 0.8 }}
-                  className="absolute z-50 bg-white/95 backdrop-blur-xl text-primary p-4 rounded-2xl shadow-2xl border border-white/50 w-48 text-center"
+                  animate={{ opacity: 1, y: -70, scale: 1 }}
+                  exit={{ opacity: 0, y: -110, scale: 0.8 }}
+                  className="absolute z-50 bg-black/80 backdrop-blur-2xl text-white p-4 rounded-3xl shadow-2xl border border-white/20 w-56 right-0 origin-bottom-right"
                 >
-                  <p className="text-[11px] font-black leading-tight drop-shadow-sm">{quote}</p>
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/95 rotate-45" />
+                  <p className="text-[12px] font-black leading-snug drop-shadow-sm italic">“ {quote} ”</p>
+                  <div className="absolute -bottom-2 right-5 w-4 h-4 bg-black/80 rotate-45" />
                 </motion.div>
               )}
             </AnimatePresence>
