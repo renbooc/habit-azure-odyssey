@@ -71,18 +71,20 @@ def get_parent_stats(family_id: str):
         return {"error": str(e)}
 
 @router.get("/history")
-def get_stats_history(family_id: str):
-    """获取指定家庭过去 7 天的专注时长与完成量统计"""
+def get_stats_history(family_id: str, username: str):
+    """获取指定用户过去 7 天的专注时长与完成量统计 (隔离模式)"""
     from datetime import datetime, timedelta
     try:
         days_ago = datetime.now() - timedelta(days=7)
-        tasks_res = supabase.table("tasks")\
+        # 加上 username 过滤，实现历史数据隔离
+        query = supabase.table("tasks")\
             .select("completed_at, target_duration, task_type")\
             .eq("completed", True)\
             .eq("family_id", family_id)\
-            .gte("completed_at", days_ago.isoformat())\
-            .execute()
+            .eq("username", username)\
+            .gte("completed_at", days_ago.isoformat())
         
+        tasks_res = query.execute()
         raw_data = tasks_res.data or []
         
         history_map = {}
@@ -91,8 +93,7 @@ def get_stats_history(family_id: str):
             history_map[d_str] = {"date": d_str, "minutes": 0, "count": 0}
             
         for t in raw_data:
-            if not t.get("completed_at"):
-                continue
+            if not t.get("completed_at"): continue
             try:
                 dt = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
                 date_key = dt.strftime("%m-%d")
@@ -100,9 +101,43 @@ def get_stats_history(family_id: str):
                     history_map[date_key]["count"] += 1
                     if t.get("task_type") == "timer":
                         history_map[date_key]["minutes"] += t.get("target_duration", 0)
-            except:
-                continue
+            except: continue
         
         return list(history_map.values())
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/leaderboard")
+def get_family_leaderboard(family_id: str):
+    """获取全家战力排行榜"""
+    try:
+        # 1. 获取全家用户
+        users_res = supabase.table("users").select("username, role, avatar").eq("family_id", family_id).execute()
+        all_users = users_res.data or []
+        
+        leaderboard = []
+        for user in all_users:
+            uname = user["username"]
+            
+            # 2. 计算该用户的任务收益
+            tasks_res = supabase.table("tasks").select("points").eq("family_id", family_id).eq("username", uname).eq("completed", True).execute()
+            gross = sum(int(t.get("points", 10)) for t in (tasks_res.data or []))
+            
+            # 3. 计算该用户的商场消耗
+            purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", uname).execute()
+            spent = sum(int(p.get("price", 0)) for p in (purchases_res.data or []))
+            
+            pts = max(0, gross - spent)
+            leaderboard.append({
+                "username": uname,
+                "role": user["role"],
+                "avatar": user.get("avatar"),
+                "points": pts,
+                "level": pts // 100 + 1
+            })
+            
+        # 按积分从高到低排序
+        leaderboard.sort(key=lambda x: x["points"], reverse=True)
+        return leaderboard
     except Exception as e:
         return {"error": str(e)}

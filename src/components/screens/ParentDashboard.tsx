@@ -3,8 +3,9 @@ import { useUser } from '@/src/context/UserContext';
 import { Card } from '@/src/components/ui/Card';
 import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
+import { cn } from '@/src/lib/utils';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
-import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed } from 'lucide-react';
+import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal } from 'lucide-react';
 
 const iconMap: Record<string, any> = {
   BookOpen, Trash2, Moon, Trophy, Star, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed
@@ -33,6 +34,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
 
   const [badgeCount, setBadgeCount] = useState(0);
   const [recentBadges, setRecentBadges] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -63,10 +65,18 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
       } catch (err) { console.error('获取成就数据失败', err); }
     };
 
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await fetch(`${API_URL}/stats/leaderboard?family_id=${user?.family_id}`);
+        if (res.ok) setLeaderboard(await res.json());
+      } catch (err) { console.error('获取排行榜失败', err); }
+    };
+
     fetchStats();
     fetchPersonalStats();
     fetchAchievements();
-  }, [user?.username]);
+    fetchLeaderboard();
+  }, [user]);
 
   const uncompleteTask = async (id: string) => {
     if (!window.confirm("确定要将此任务标记为未完成吗？")) return;
@@ -175,6 +185,59 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         </div>
         <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-primary-container/20 rounded-full blur-3xl" />
       </div>
+
+      {/* Family Leaderboard - HERO LIST */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 px-2">
+          <Crown className="text-[#FFD700]" size={24} />
+          <h2 className="text-on-primary-container font-black text-xl">全家英雄榜</h2>
+        </div>
+
+        <Card className="p-2 bg-surface-container-low border-none space-y-1">
+          {leaderboard.length === 0 ? (
+            <p className="text-center py-6 text-on-surface-variant/40 text-sm italic font-bold">暂无排名数据...</p>
+          ) : leaderboard.map((player, index) => (
+            <div
+              key={player.username}
+              className={cn(
+                "flex items-center justify-between p-4 rounded-2xl transition-all",
+                player.username === user?.username ? "bg-primary/10 shadow-sm border border-primary/10" : "hover:bg-surface-variant/30"
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center font-black text-sm",
+                  index === 0 ? "bg-[#FFD700] text-amber-900 shadow-md shadow-amber-500/20" :
+                    index === 1 ? "bg-[#C0C0C0] text-gray-800 shadow-md shadow-gray-400/20" :
+                      index === 2 ? "bg-[#CD7F32] text-orange-950 shadow-md shadow-orange-800/20" :
+                        "bg-surface-container-high text-on-surface-variant/40"
+                )}>
+                  {index + 1}
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-on-surface tracking-tight">{player.username}</span>
+                    {player.role === 'parent' && <span className="text-[10px] bg-primary/20 text-primary px-1.5 rounded font-black">家长</span>}
+                  </div>
+                  <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">等级 {player.level} 探险家</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1 justify-end">
+                  <span className="text-lg font-black text-primary italic">{player.points}</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">pts</span>
+                </div>
+                <div className="w-16 h-1 bg-surface-container-high rounded-full mt-1 overflow-hidden">
+                  <div
+                    className="h-full bg-primary"
+                    style={{ width: `${Math.min(100, (player.points / (leaderboard[0]?.points || 1)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </Card>
+      </section>
 
       {/* Task List */}
       <section className="space-y-6">
