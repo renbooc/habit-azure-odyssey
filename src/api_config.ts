@@ -1,13 +1,12 @@
-// 动态探测 API 地址：生产环境下从环境变量读取，开发环境下默认连本地 8000
+// 动态探测 API 地址
 export const getApiBase = () => {
-    // 如果环境变量中定义了 VITE_API_BASE (Vercel 部署时设置)，则使用它
-    const envApiBase = (import.meta as any).env.VITE_API_BASE;
-    if (envApiBase) {
-        return envApiBase;
+    // 1. 如果是 Hugging Face 或 Vercel 部署环境，直接返回相对路径 /api，不带端口号
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        return "/api";
     }
 
-    // 本地开发环境逻辑
-    const hostname = window.location.hostname;
+    // 2. 本地开发环境逻辑：默认连 8000 端口
     const protocol = window.location.protocol;
     return `${protocol}//${hostname}:8000/api`;
 };
