@@ -224,13 +224,13 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 justify-end">
-                  <span className="text-lg font-black text-primary italic">{player.points}</span>
-                  <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">pts</span>
+                  <span className="text-lg font-black text-primary italic" title="总阅历积分">{player.total_xp}</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">xp</span>
                 </div>
                 <div className="w-16 h-1 bg-surface-container-high rounded-full mt-1 overflow-hidden">
                   <div
                     className="h-full bg-primary"
-                    style={{ width: `${Math.min(100, (player.points / (leaderboard[0]?.points || 1)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (player.total_xp / (leaderboard[0]?.total_xp || 1)) * 100)}%` }}
                   />
                 </div>
               </div>

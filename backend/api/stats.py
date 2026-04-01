@@ -32,18 +32,19 @@ def get_child_stats(family_id: str, username: str):
         spent = sum(p.get("price", 0) for p in (purchases_res.data or []))
         points = max(0, gross - spent)
         
-        # 应用动态等级系统
-        lvl_info = get_level_data(points)
+        # 应用动态等级系统 (基于永不降低的总阅历 gross)
+        lvl_info = get_level_data(gross)
         
         uncompleted = [t for t in tasks_data if not t.get("completed")]
         return {
             "level": lvl_info["level"],
             "level_title": lvl_info["title"],
             "level_emoji": lvl_info["emoji"],
+            "total_xp": gross,
+            "points": points, # 这里依然是余额，用于商城购买
             "streak_days": 1, 
             "plants_count": len(completed_tasks),
             "water_drops": points,
-            "points": points,
             "quick_tasks": uncompleted[:2]
         }
     except Exception as e:
@@ -116,7 +117,7 @@ def get_stats_history(family_id: str, username: str):
 
 @router.get("/leaderboard")
 def get_family_leaderboard(family_id: str):
-    """获取排行榜 (同步动态等级信息)"""
+    """获取排行榜 (按总阅历排序，展示荣誉)"""
     try:
         users_res = supabase.table("users").select("username, role, avatar").eq("family_id", family_id).execute()
         all_users = users_res.data or []
@@ -124,23 +125,24 @@ def get_family_leaderboard(family_id: str):
         for user in all_users:
             uname = user["username"]
             tasks_res = supabase.table("tasks").select("points").eq("family_id", family_id).eq("username", uname).eq("completed", True).execute()
-            gross = sum(int(t.get("points", 10)) for t in (tasks_res.data or []))
-            purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", uname).execute()
-            spent = sum(int(p.get("price", 0)) for p in (purchases_res.data or []))
-            pts = max(0, gross - spent)
+            
+            # 使用总阅历进行排名
+            total_xp = sum(int(t.get("points", 10)) for t in (tasks_res.data or []))
             
             # 使用统一等级算法
-            lvl_info = get_level_data(pts)
+            lvl_info = get_level_data(total_xp)
             
             leaderboard.append({
                 "username": uname,
                 "role": user["role"],
                 "avatar": user.get("avatar"),
-                "points": pts,
+                "total_xp": total_xp,
                 "level": lvl_info["level"],
                 "level_title": lvl_info["title"]
             })
-        leaderboard.sort(key=lambda x: x["points"], reverse=True)
+            
+        # 按【总阅历】从高到低排序，确立家庭地位
+        leaderboard.sort(key=lambda x: x["total_xp"], reverse=True)
         return leaderboard
     except Exception as e:
         return {"error": str(e)}
