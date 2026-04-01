@@ -1,4 +1,4 @@
-// 动态探测 API 地址
+// 动态探测 API 地址 (版本更新：彻底移除生产环境 8000 端口)
 export const getApiBase = () => {
     // 1. 如果是 Hugging Face 或 Vercel 部署环境，直接返回相对路径 /api，不带端口号
     const hostname = window.location.hostname;
@@ -12,3 +12,4 @@ export const getApiBase = () => {
 };
 
 export const API_URL = getApiBase();
+console.log(`[API URL] Current API Base: ${API_URL}`);
