@@ -28,10 +28,14 @@ from api import users, achievements
 app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(achievements.router, tags=["成就徽章"])
 
-@app.get("/api/health")
-async def health_check():
-    """健康检查接口"""
-    return {"status": "ok"}
+from fastapi.staticfiles import StaticFiles
+import os
+
+# 如果 dist 目录存在（生产环境下），则挂载静态文件服务
+if os.path.exists("../dist"):
+    app.mount("/", StaticFiles(directory="../dist", html=True), name="static")
+elif os.path.exists("dist"):
+    app.mount("/", StaticFiles(directory="dist", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=False) # HF 默认使用 7860 端口

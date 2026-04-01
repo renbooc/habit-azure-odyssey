@@ -1,0 +1,22 @@
+name: Sync to Hugging Face
+on:
+  push:
+    branches: [main]
+  # 允许手动运行
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Push to hub
+        env:
+          # 请在此处替换为你的 HF 用户名和 Space 名字
+          HF_HUB_URL: https://huggingface.co/spaces/renbooc/habit-odyssey
+          HF_HABITS_TOKEN: ${{ secrets.HF_HABITS_TOKEN }}
+        run: |
+          git push --force https://x-access-token:$HF_HABITS_TOKEN@$(echo $HF_HUB_URL | cut -d'/' -f3-) $GITHUB_REF_NAME:main
