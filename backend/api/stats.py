@@ -47,9 +47,9 @@ def get_parent_stats(family_id: str):
         # 1. 家族最近完成的任务
         recent_res = supabase.table("tasks")\
             .select("*")\
-            .filter("completed", "eq", True)\
+            .eq("completed", True)\
             .eq("family_id", family_id)\
-            .order("created_at", desc=True)\
+            .order("completed_at", desc=True)\
             .limit(5)\
             .execute()
         

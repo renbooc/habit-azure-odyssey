@@ -5,7 +5,7 @@ import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
 import { cn } from '@/src/lib/utils';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
-import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal } from 'lucide-react';
+import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal, User } from 'lucide-react';
 
 const iconMap: Record<string, any> = {
   BookOpen, Trash2, Moon, Trophy, Star, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed
@@ -259,7 +259,14 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
                 </div>
                 <div>
                   <h4 className="font-bold text-on-surface">{task.title}</h4>
-                  <p className="text-xs text-on-surface-variant/60">奖励：{task.points} 积分</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] text-on-surface-variant/60 font-black uppercase tracking-tight">奖励：{task.points} 积分</p>
+                    {task.username && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded font-black flex items-center gap-0.5">
+                        <User size={8} /> {task.username}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div
