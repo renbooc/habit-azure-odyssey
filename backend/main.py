@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# 打印环境变量加载情况 (不打印完整 Key，只检查存不存在)
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+print(f"DEBUG: SUPABASE_URL is {'SET' if supabase_url else 'MISSING'}")
+print(f"DEBUG: SUPABASE_KEY is {'SET' if supabase_key else 'MISSING'}")
+
 from api import auth, tasks, store, stats
 
 app = FastAPI(title="Azure Odyssey API", description="家庭任务管理与积分系统 API", version="1.0.0")
