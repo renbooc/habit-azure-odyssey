@@ -52,7 +52,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     };
     fetchStats();
     fetchHistory();
-  }, []);
+  }, [user?.username]);
 
   const triggerConfetti = () => {
     confetti({

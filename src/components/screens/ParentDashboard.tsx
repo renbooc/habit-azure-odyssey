@@ -66,7 +66,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
     fetchStats();
     fetchPersonalStats();
     fetchAchievements();
-  }, [user]);
+  }, [user?.username]);
 
   const uncompleteTask = async (id: string) => {
     if (!window.confirm("确定要将此任务标记为未完成吗？")) return;

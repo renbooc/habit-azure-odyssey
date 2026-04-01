@@ -26,13 +26,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [role, setRole] = useState<'parent' | 'child'>('parent');
     const [points, setPoints] = useState(0);
 
+    const isRefreshing = React.useRef(false);
     const refreshPoints = useCallback(async () => {
-        // 如果没有用户登录，不需要刷新
+        if (isRefreshing.current) return;
+
+        // 关键逻辑：直接读取持久化数据，保证 refreshPoints 函数引用的绝对稳定性
         const saved = localStorage.getItem('currentUser');
-        const currentUser = user || (saved ? JSON.parse(saved) : null);
-        if (!currentUser || !currentUser.family_id) return;
+        if (!saved) return;
 
         try {
+            const currentUser = JSON.parse(saved);
+            if (!currentUser || !currentUser.family_id) return;
+
+            isRefreshing.current = true;
             const res = await fetch(`${API_URL}/stats/child?family_id=${currentUser.family_id}&username=${currentUser.username}`);
             if (res.ok) {
                 const data = await res.json();
@@ -40,8 +46,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (err) {
             console.error('Failed to refresh points:', err);
+        } finally {
+            // 给网络连接和状态更新留出充足的冷静期
+            setTimeout(() => { isRefreshing.current = false; }, 1000);
         }
-    }, [user]);
+    }, []); // 依赖设为空，函数引用永不改变
 
     const login = (userData: any) => {
         setUser(userData);

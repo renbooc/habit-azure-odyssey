@@ -56,7 +56,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
   useEffect(() => {
     fetchTasks();
     fetchPresets();
-  }, []);
+  }, [user?.username]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
