@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Input } from '@/src/components/ui/Input';
+import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
 import { User, Lock, ArrowRight, Baby, Users } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -27,7 +28,7 @@ export const Login = ({ onLogin, onNavigateToRegister }: LoginProps) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/auth/login`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role })

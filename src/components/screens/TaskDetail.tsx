@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
+import { API_URL } from '@/src/api_config';
 import { ArrowLeft, Check, Pause, Play, BadgeCheck, BookOpen, Bed, Leaf, Droplets, Puzzle } from 'lucide-react';
 
 interface TaskDetailProps {
@@ -31,7 +32,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
     if (!task || completing) return;
     setCompleting(true);
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/${taskId}`, {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: true })
@@ -80,7 +81,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
   useEffect(() => {
     const fetchTask = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/${taskId}`);
+        const res = await fetch(`${API_URL}/tasks/${taskId}`);
         if (res.ok) {
           const data = await res.json();
           setTask(data);

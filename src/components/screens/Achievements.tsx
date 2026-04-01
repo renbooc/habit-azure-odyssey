@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/src/components/ui/Card';
+import { API_URL } from '@/src/api_config';
 import { Rocket, Moon, Lock, Droplets, BookOpen, Brain, TreePine, Zap, BadgeCheck, Gift, CheckCircle, Clock, Star, Puzzle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 
@@ -15,7 +16,7 @@ export const Achievements = () => {
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/achievements/child`);
+        const res = await fetch(`${API_URL}/achievements/child`);
         if (res.ok) {
           const json = await res.json();
           setData(json);

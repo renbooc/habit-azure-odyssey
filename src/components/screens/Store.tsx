@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_URL } from '@/src/api_config';
 import { Card } from '@/src/components/ui/Card';
 import { ShoppingBag, Lightbulb, Gamepad2, BookOpen, Tv, Stars, Gift, Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/src/components/ui/Input';
@@ -55,7 +56,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/store/items`);
+      const res = await fetch(`${API_URL}/store/items`);
       if (res.ok) {
         const data = await res.json();
         const enhancedData = data.map((item: any) => ({
@@ -79,7 +80,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
   const handleAddItem = async () => {
     if (!newItemName || newItemPrice <= 0) return;
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/store/items`, {
+      const res = await fetch(`${API_URL}/store/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newItemName, price: newItemPrice, icon: newItemIcon })
@@ -99,7 +100,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
   const handleDeleteItem = async (id: string) => {
     if (!window.confirm("确定删除这个奖励吗？")) return;
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/store/items/${id}`, {
+      const res = await fetch(`${API_URL}/store/items/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -226,7 +227,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
                     if (userPoints >= item.price) {
                       setPurchasingId(item.id);
                       try {
-                        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/store/purchase`, {
+                        const res = await fetch(`${API_URL}/store/purchase`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ item_id: item.id, price: item.price })

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/src/components/ui/Card';
+import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
 import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed } from 'lucide-react';
@@ -30,7 +31,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/parent`);
+        const res = await fetch(`${API_URL}/stats/parent`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -42,7 +43,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
 
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/achievements/child`);
+        const res = await fetch(`${API_URL}/achievements/child`);
         if (res.ok) {
           const data = await res.json();
           setBadgeCount(data.unlocked_count || 0);
@@ -64,7 +65,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   const uncompleteTask = async (id: string) => {
     if (!window.confirm("确定要将此任务标记为未完成吗？")) return;
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/${id}`, {
+      const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: false })

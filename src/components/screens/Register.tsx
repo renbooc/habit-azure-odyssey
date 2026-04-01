@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Input } from '@/src/components/ui/Input';
+import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
 import { User, Lock, Shield, Ship } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export const Register = ({ onRegister, onNavigateToLogin }: RegisterProps) => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/auth/register`, {
+      const res = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role })

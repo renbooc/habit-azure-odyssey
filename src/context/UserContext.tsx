@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { API_URL } from '@/src/api_config';
 
 interface User {
     id: string;
@@ -26,7 +27,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const refreshPoints = useCallback(async () => {
         try {
-            const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/child`);
+            const res = await fetch(`${API_URL}/stats/child`);
             if (res.ok) {
                 const data = await res.json();
                 setPoints(data.points || 0);
@@ -51,7 +52,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updateAvatar = async (url: string) => {
         if (!user) return;
         try {
-            const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/users/${user.username}/avatar`, {
+            const res = await fetch(`${API_URL}/users/${user.username}/avatar`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ avatar: url })

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/src/components/ui/Card';
+import { API_URL } from '@/src/api_config';
 import { Flame, Droplets, Leaf, Check, Bed, BookOpen, Puzzle, Palette, Play, Pause, X, CheckCircle2, Circle, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -24,7 +25,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/child`);
+        const res = await fetch(`${API_URL}/stats/child`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -35,7 +36,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     };
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/stats/history`);
+        const res = await fetch(`${API_URL}/stats/history`);
         if (res.ok) {
           const data = await res.json();
           // 确保返回的是数组
@@ -83,7 +84,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
 
   const handleToggleTask = async (taskId: string) => {
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/${taskId}`, {
+      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: true })

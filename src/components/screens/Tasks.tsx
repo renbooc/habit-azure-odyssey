@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Settings2, Plus, Star } from 'lucide-react';
+import { API_URL } from '@/src/api_config';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/src/components/ui/Button';
@@ -46,7 +47,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
   const [loading, setLoading] = useState(true);
   const [activeTimer, setActiveTimer] = useState<{ id: string, title: string, remaining: number, isPaused: boolean } | null>(null);
 
-  const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000/api/tasks`;
+  const API_BASE = `${API_URL}/tasks`;
 
   useEffect(() => {
     fetchTasks();
@@ -76,7 +77,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const fetchPresets = async () => {
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/templates`);
+      const res = await fetch(`${API_URL}/tasks/templates`);
       if (res.ok) setPresets(await res.json());
     } catch (e) { console.error('Failed to fetch presets', e); }
   };
@@ -129,7 +130,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const addTemplate = async () => {
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/templates`, {
+      const res = await fetch(`${API_URL}/tasks/templates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,7 +149,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
   const deleteTemplate = async (id: string) => {
     if (!window.confirm('确定要删除这个挑战模板吗？')) return;
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8000/api/tasks/templates/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/tasks/templates/${id}`, { method: 'DELETE' });
       if (res.ok) fetchPresets();
     } catch (e) { console.error(e); }
   };
