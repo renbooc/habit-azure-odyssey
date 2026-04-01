@@ -5,6 +5,7 @@ interface User {
     id: string;
     username: string;
     role: 'parent' | 'child';
+    family_id: string;
     avatar?: string;
 }
 
@@ -29,10 +30,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // 如果没有用户登录，不需要刷新
         const saved = localStorage.getItem('currentUser');
         const currentUser = user || (saved ? JSON.parse(saved) : null);
-        if (!currentUser) return;
+        if (!currentUser || !currentUser.family_id) return;
 
         try {
-            const res = await fetch(`${API_URL}/stats/child?username=${currentUser.username}`);
+            const res = await fetch(`${API_URL}/stats/child?family_id=${currentUser.family_id}&username=${currentUser.username}`);
             if (res.ok) {
                 const data = await res.json();
                 setPoints(data.points || 0);
@@ -86,7 +87,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.error('Failed to parse saved user', e);
             }
         }
-    }, [refreshPoints]);
+    }, []); // 仅在挂载时执行一次初始化
 
     return (
         <UserContext.Provider value={{ user, role, points, login, logout, refreshPoints, updateAvatar }}>

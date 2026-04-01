@@ -16,15 +16,19 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
     completed_tasks: 0,
     completion_rate: 0,
     weekly_data: [
-      { name: '周一', value: 0 },
-      { name: '周二', value: 0 },
-      { name: '周三', value: 0 },
-      { name: '周四', value: 0 },
-      { name: '周五', value: 0 },
-      { name: '周六', value: 0 },
+      { name: '周一', value: 0 }, { name: '周二', value: 0 }, { name: '周三', value: 0 },
+      { name: '周四', value: 0 }, { name: '周五', value: 0 }, { name: '周六', value: 0 },
       { name: '周日', value: 0 },
     ],
     recent_tasks: [] as any[]
+  });
+
+  const [personalStats, setPersonalStats] = useState({
+    level: 1,
+    streak_days: 1,
+    plants_count: 0,
+    water_drops: 0,
+    points: 0
   });
 
   const [badgeCount, setBadgeCount] = useState(0);
@@ -33,36 +37,36 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/parent?username=${user?.username}`);
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
-      } catch (err) {
-        console.error('获取家长统计数据失败', err);
-      }
+        const res = await fetch(`${API_URL}/stats/parent?family_id=${user?.family_id}`);
+        if (res.ok) setStats(await res.json());
+      } catch (err) { console.error('获取家长统计数据失败', err); }
+    };
+
+    const fetchPersonalStats = async () => {
+      try {
+        const res = await fetch(`${API_URL}/stats/child?family_id=${user?.family_id}&username=${user?.username}`);
+        if (res.ok) setPersonalStats(await res.json());
+      } catch (err) { console.error('获取个人统计数据失败', err); }
     };
 
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${API_URL}/achievements/child?username=${user?.username}`);
+        const res = await fetch(`${API_URL}/achievements/child?family_id=${user?.family_id}&username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setBadgeCount(data.unlocked_count || 0);
-
           if (data.badges) {
             const unlocked = data.badges.filter((b: any) => b.unlocked);
-            setRecentBadges(unlocked.slice(-2)); // 取最近解锁的两个用于展示
+            setRecentBadges(unlocked.slice(-2));
           }
         }
-      } catch (err) {
-        console.error('获取成就数据失败', err);
-      }
+      } catch (err) { console.error('获取成就数据失败', err); }
     };
 
     fetchStats();
+    fetchPersonalStats();
     fetchAchievements();
-  }, []);
+  }, [user]);
 
   const uncompleteTask = async (id: string) => {
     if (!window.confirm("确定要将此任务标记为未完成吗？")) return;
@@ -70,7 +74,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
       const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false, username: user?.username })
+        body: JSON.stringify({ completed: false, family_id: user?.family_id })
       });
       if (res.ok) {
         // Optimistically remove from recent tasks
@@ -92,16 +96,34 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
 
   return (
     <div className="space-y-8 pb-32">
+      {/* Personal Progress Stats (Equal Status) */}
+      <section className="grid grid-cols-2 gap-4">
+        <Card className="p-6 bg-primary/5 border-none shadow-none flex flex-col justify-center items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary mb-3">
+            <Trophy size={24} />
+          </div>
+          <p className="text-xs font-black text-primary/60 uppercase tracking-widest mb-1">当前等级</p>
+          <h3 className="text-2xl font-black text-on-surface">LV.{personalStats.level}</h3>
+        </Card>
+        <Card className="p-6 bg-secondary/5 border-none shadow-none flex flex-col justify-center items-center text-center">
+          <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center text-secondary mb-3">
+            <Star size={24} />
+          </div>
+          <p className="text-xs font-black text-secondary/60 uppercase tracking-widest mb-1">个人积分</p>
+          <h3 className="text-2xl font-black text-on-surface">{personalStats.points}</h3>
+        </Card>
+      </section>
+
       {/* Weekly Progress */}
       <Card className="p-8">
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h2 className="text-on-primary-container font-bold text-xl mb-1">本周进度回顾</h2>
-            <p className="text-on-surface-variant text-sm">孩子本周完成了 {stats.completion_rate}% 的既定任务</p>
+            <h2 className="text-on-primary-container font-bold text-xl mb-1">全家进度回顾</h2>
+            <p className="text-on-surface-variant text-sm text-[#FF8C42] font-black">家庭本周活跃度 {stats.completion_rate}%</p>
           </div>
           <div className="text-right">
             <span className="text-3xl font-extrabold text-primary">{stats.completed_tasks}</span>
-            <span className="text-on-surface-variant text-sm block">已完成任务</span>
+            <span className="text-on-surface-variant text-sm block">全家已完成</span>
           </div>
         </div>
 

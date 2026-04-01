@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Input } from '@/src/components/ui/Input';
+import { useUser } from '@/src/context/UserContext';
 import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
 import { User, Lock, Shield, Ship } from 'lucide-react';
@@ -13,14 +14,16 @@ export const Register = ({ onRegister, onNavigateToLogin }: RegisterProps) => {
   const [role, setRole] = useState<'parent' | 'child'>('parent');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [familyId, setFamilyId] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useUser();
 
   const handleRegister = async () => {
     setError('');
 
-    if (!username || !password) {
-      setError('请输入用户名和密码');
+    if (!username || !password || !familyId) {
+      setError('请输入用户名、密码和家庭 ID');
       return;
     }
 
@@ -34,12 +37,12 @@ export const Register = ({ onRegister, onNavigateToLogin }: RegisterProps) => {
       const res = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role })
+        body: JSON.stringify({ username, password, role, family_id: familyId })
       });
 
       if (res.ok) {
-        // 注册成功后可直接视为登录，或返回登录页
-        // 这里沿用原来的直接执行 onRegister
+        const userData = await res.json();
+        login(userData);
         onRegister();
       } else {
         const errData = await res.json();
@@ -80,6 +83,13 @@ export const Register = ({ onRegister, onNavigateToLogin }: RegisterProps) => {
             placeholder="请输入 6-16 位密码"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+          />
+          <Input
+            label="家庭 ID (Family ID)"
+            placeholder="例如: SmithFamily"
+            value={familyId}
+            onChange={(e) => setFamilyId(e.target.value)}
+            helperText="家长和孩子请填入相同的家庭 ID 以同步数据"
           />
 
           <div className="space-y-3">

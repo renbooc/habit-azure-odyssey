@@ -49,42 +49,47 @@ def delete_task_template(template_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[TaskResponse])
-def get_all_tasks(username: str):
-    """获取指定用户的任务列表（并自动生成当日挑战）"""
+def get_all_tasks(family_id: str, username: Optional[str] = None):
+    """获取指定家庭的任务列表（如果是孩子，则支持当日挑战自动生成）"""
     try:
-        # 针对该用户生成每日挑战 (Lazy spawn)
-        import datetime
-        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        dailies = supabase.table("task_templates").select("*").eq("is_daily", True).execute()
-        
-        if dailies.data:
-            # 检查该用户今天是否已经有了这些挑战
-            existing_today = supabase.table("tasks")\
-                .select("template_id")\
-                .eq("username", username)\
-                .not_.is_("template_id", "null")\
-                .gte("created_at", f"{today_str}T00:00:00Z")\
-                .execute()
+        # 1. 只有当明确指定了 username (孩子端拉取) 时，才触发当日挑战的生成
+        if username:
+            import datetime
+            today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+            # 获取需要生成的每日挑战模板
+            dailies = supabase.table("task_templates").select("*").eq("is_daily", True).execute()
+            
+            if dailies.data:
+                # 检查该特定孩子今天是否已经领过这些任务
+                existing_today = supabase.table("tasks")\
+                    .select("template_id")\
+                    .eq("family_id", family_id)\
+                    .eq("username", username)\
+                    .not_.is_("template_id", "null")\
+                    .gte("created_at", f"{today_str}T00:00:00Z")\
+                    .execute()
+                    
+                existing_ids = {t["template_id"] for t in existing_today.data if t.get("template_id")} if existing_today.data else set()
+     
+                to_insert = []
+                for tmpl in dailies.data:
+                    if tmpl["id"] not in existing_ids:
+                        to_insert.append({
+                            "family_id": family_id,
+                            "username": username, # 绑定到具体孩子
+                            "title": tmpl["title"],
+                            "points": tmpl["points"],
+                            "icon": tmpl["icon"],
+                            "completed": False,
+                            "template_id": tmpl["id"],
+                            "task_type": tmpl.get("task_type", "checkbox"),
+                            "target_duration": tmpl.get("target_duration", 0)
+                        })
+                if to_insert:
+                    supabase.table("tasks").insert(to_insert).execute()
                 
-            existing_ids = {t["template_id"] for t in existing_today.data if t.get("template_id")} if existing_today.data else set()
- 
-            to_insert = []
-            for tmpl in dailies.data:
-                if tmpl["id"] not in existing_ids:
-                    to_insert.append({
-                        "username": username,
-                        "title": tmpl["title"],
-                        "points": tmpl["points"],
-                        "icon": tmpl["icon"],
-                        "completed": False,
-                        "template_id": tmpl["id"],
-                        "task_type": tmpl.get("task_type", "checkbox"),
-                        "target_duration": tmpl.get("target_duration", 0)
-                    })
-            if to_insert:
-                supabase.table("tasks").insert(to_insert).execute()
-                
-        return TaskService.get_tasks(username)
+        # 2. 调用服务层：如果传了 username 则只返回该孩子的；没传则返回全家人的（家长视图）
+        return TaskService.get_tasks(family_id, username)
     except Exception as e:
         import traceback
         traceback.print_exc()

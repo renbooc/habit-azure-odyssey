@@ -14,6 +14,7 @@ interface Task {
     title: string;
     points: number;
     icon: string;
+    username?: string;
     completed: boolean;
     task_type?: 'checkbox' | 'timer';
     target_duration?: number;
@@ -75,6 +76,11 @@ export const TaskCard = ({ task, role, onToggle, onStartTimer, onDelete }: TaskC
                         <span className="text-[10px] font-bold text-on-surface-variant/40 flex items-center gap-1">
                             <Clock size={10} />
                             {task.target_duration} 分钟专注
+                        </span>
+                    )}
+                    {role === 'parent' && task.username && (
+                        <span className="text-[10px] font-black text-primary/40 uppercase tracking-widest px-2 py-0.5 rounded bg-primary/5">
+                            归属人: {task.username}
                         </span>
                     )}
                 </div>

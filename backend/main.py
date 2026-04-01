@@ -44,4 +44,7 @@ elif os.path.exists("dist"):
     app.mount("/", StaticFiles(directory="dist", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=False) # HF 默认使用 7860 端口
+    # 使用 8000 作为本地默认端口，Hugging Face 会自动传递 PORT 环境变量
+    port = int(os.getenv("PORT", 8000))
+    print(f"Starting server... port: {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

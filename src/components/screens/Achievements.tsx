@@ -18,7 +18,7 @@ export const Achievements = () => {
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${API_URL}/achievements/child?username=${user?.username}`);
+        const res = await fetch(`${API_URL}/achievements/child?family_id=${user?.family_id}&username=${user?.username}`);
         if (res.ok) {
           const json = await res.json();
           setData(json);

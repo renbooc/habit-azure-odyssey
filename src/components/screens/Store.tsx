@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useUser } from '@/src/context/UserContext';
 import { API_URL } from '@/src/api_config';
 import { Card } from '@/src/components/ui/Card';
-import { ShoppingBag, Lightbulb, Gamepad2, BookOpen, Tv, Stars, Gift, Plus, Trash2 } from 'lucide-react';
+import { ShoppingBag, Lightbulb, Gamepad2, BookOpen, Tv, Stars, Gift, Plus, Trash2, Wallet } from 'lucide-react';
+import { Modal } from '../ui/Modal';
 import { Input } from '@/src/components/ui/Input';
 import { cn } from '@/src/lib/utils';
 
@@ -33,6 +34,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string, message: string, onConfirm: () => void, type?: 'info' | 'danger' } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('全部');
   const [isAdding, setIsAdding] = useState(false);
@@ -58,7 +60,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/store/items?username=${user?.username}`);
+      const res = await fetch(`${API_URL}/store/items?family_id=${user?.family_id}`);
       if (res.ok) {
         const data = await res.json();
         const enhancedData = data.map((item: any) => ({
@@ -99,19 +101,18 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!window.confirm("确定删除这个奖励吗？")) return;
-    try {
-      const res = await fetch(`${API_URL}/store/items/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchItems();
-        showToast('🗑️ 已删除商品');
+  const handleDeleteItem = (id: string) => {
+    setConfirmConfig({
+      title: '下架商品？',
+      message: '确定要从商城中移除这个奖励吗？已经兑换的孩子不会受到影响。',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_URL}/store/items/${id}`, { method: 'DELETE' });
+          if (res.ok) { fetchItems(); showToast('🗑️ 已删除商品'); }
+        } catch (e) { console.error(e); }
       }
-    } catch (e) {
-      console.error(e);
-    }
+    });
   };
 
   const renderIcon = (iconName: string) => {
@@ -225,28 +226,39 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
               ) : (
                 <button
                   disabled={item.comingSoon || userPoints < item.price || purchasingId === item.id}
-                  onClick={async () => {
-                    if (userPoints >= item.price) {
-                      setPurchasingId(item.id);
-                      try {
-                        const res = await fetch(`${API_URL}/store/purchase`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ item_id: item.id, price: item.price, username: user?.username })
-                        });
-                        if (res.ok) {
-                          showToast('🎉 兑换成功！');
-                          if (onPurchase) onPurchase(); // 刷新全局积分
-                        } else {
-                          showToast('❌ 兑换失败，请稍后重试');
+                  onClick={() => {
+                    if (userPoints < item.price) return;
+                    setConfirmConfig({
+                      title: '确认兑换吗？',
+                      message: `你将消耗 ${item.price} 积分兑换 [${item.name}]。确认后点数将立即扣除哦！`,
+                      type: 'info',
+                      onConfirm: async () => {
+                        setPurchasingId(item.id);
+                        try {
+                          const res = await fetch(`${API_URL}/store/purchase`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              item_id: item.id,
+                              price: item.price,
+                              family_id: user?.family_id,
+                              username: user?.username
+                            })
+                          });
+                          if (res.ok) {
+                            showToast('🎉 兑换成功！');
+                            if (onPurchase) onPurchase();
+                          } else {
+                            showToast('❌ 兑换失败，请稍后重试');
+                          }
+                        } catch (e) {
+                          console.error(e);
+                          showToast('❌ 网络错误');
+                        } finally {
+                          setPurchasingId(null);
                         }
-                      } catch (e) {
-                        console.error(e);
-                        showToast('❌ 网络错误');
-                      } finally {
-                        setPurchasingId(null);
                       }
-                    }
+                    });
                   }}
                   className={cn(
                     'w-full py-3 px-4 rounded-full font-bold transition-all relative',
@@ -379,6 +391,17 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
           </div>
         )}
       </AnimatePresence>
+
+      <Modal
+        isOpen={!!confirmConfig}
+        onClose={() => setConfirmConfig(null)}
+        onConfirm={() => confirmConfig?.onConfirm()}
+        title={confirmConfig?.title || '确认操作'}
+        message={confirmConfig?.message || '确认执行此操作吗？'}
+        confirmText="确定"
+        cancelText="取消"
+        type={confirmConfig?.type || 'info'}
+      />
     </div>
   );
 };

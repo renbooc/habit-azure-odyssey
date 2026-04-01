@@ -39,13 +39,17 @@ def delete_store_item(item_id: str):
 class PurchaseRequest(BaseModel):
     item_id: str
     price: int
+    family_id: str
+    username: str
 
 @router.post("/purchase")
 def purchase_item(req: PurchaseRequest):
     try:
         res = supabase.table("store_purchases").insert({
             "item_id": req.item_id,
-            "price": req.price
+            "price": req.price,
+            "family_id": req.family_id,
+            "username": req.username
         }).execute()
         if res.data:
             return {"status": "success", "message": "兑换成功！"}

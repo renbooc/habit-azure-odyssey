@@ -1,16 +1,21 @@
 from repository.supabase_client import supabase
 from schema.tasks import TaskCreate, TaskUpdate
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 class TaskService:
     @staticmethod
-    def get_tasks(username: str) -> List[Dict[str, Any]]:
-        response = supabase.table("tasks")\
+    def get_tasks(family_id: str, username: Optional[str] = None) -> List[Dict[str, Any]]:
+        """获取任务列表：强制个人隐私隔离"""
+        query = supabase.table("tasks")\
             .select("*")\
-            .eq("username", username)\
-            .order("created_at", desc=True)\
-            .execute()
+            .eq("family_id", family_id)
+        
+        if username:
+            # 无论家长还是孩子，只要在个人大厅，都只看自己的
+            query = query.eq("username", username)
+            
+        response = query.order("created_at", desc=True).execute()
         return response.data
 
     @staticmethod
@@ -22,24 +27,35 @@ class TaskService:
 
     @staticmethod
     def create_task(task: TaskCreate) -> Dict[str, Any]:
-        data = {}
-        for k, v in task.model_dump().items():
-            if v is not None:
-                if isinstance(v, datetime):
-                    data[k] = v.isoformat()
-                else:
-                    data[k] = v
+        """创建并全员分发任务：确保每个人都有一份属于自己的平行副本"""
+        # 1. 查找家庭全员
+        members_res = supabase.table("users").select("username").eq("family_id", task.family_id).execute()
         
-        response = supabase.table("tasks").insert(data).execute()
-        if response.data:
-            return response.data[0]
-        return {}
+        if members_res.data:
+            to_insert = []
+            for member in members_res.data:
+                data = task.model_dump()
+                data["username"] = member["username"] # 分发给包括家长在内的所有人
+                # 转换 datetime 为 iso 格式
+                for k, v in data.items():
+                    if isinstance(v, datetime): data[k] = v.isoformat()
+                to_insert.append(data)
+            res = supabase.table("tasks").insert(to_insert).execute()
+            return res.data[0] if res.data else {}
+        else:
+            # 保底逻辑
+            data = task.model_dump()
+            for k,v in data.items():
+                if isinstance(v, datetime): data[k]=v.isoformat()
+            res = supabase.table("tasks").insert(data).execute()
+            return res.data[0] if res.data else {}
 
     @staticmethod
     def update_task(task_id: str, task: TaskUpdate) -> Dict[str, Any]:
+        """更新任务状态：禁止修改归属 (username/family_id)"""
         update_data = {}
         for k, v in task.model_dump().items():
-            if v is not None:
+            if v is not None and k not in ['username', 'family_id']:
                 if isinstance(v, datetime):
                     update_data[k] = v.isoformat()
                 else:

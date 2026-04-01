@@ -5,11 +5,11 @@ from typing import Dict, Any, List
 router = APIRouter()
 
 @router.get("/child")
-def get_child_stats(username: str):
-    """获取指定用户的孩子端面板数据"""
+def get_child_stats(family_id: str, username: str):
+    """获取指定家庭中特定用户的孩子端面板数据"""
     try:
-        # 只获取当前用户的任务
-        tasks_res = supabase.table("tasks").select("*").eq("username", username).execute()
+        # 只获取当前家庭中属于该用户的任务
+        tasks_res = supabase.table("tasks").select("*").eq("family_id", family_id).eq("username", username).execute()
         tasks_data = tasks_res.data or []
         
         # 积分逻辑：统计该用户的完成情况
@@ -20,7 +20,7 @@ def get_child_stats(username: str):
             gross_points += int(p_val) if p_val is not None else 10
         
         # 统计该用户的购买消耗
-        purchases_res = supabase.table("store_purchases").select("price").eq("username", username).execute()
+        purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", username).execute()
         spent_points = sum(p.get("price", 0) for p in (purchases_res.data or []))
         
         points = max(0, gross_points - spent_points)
@@ -31,7 +31,7 @@ def get_child_stats(username: str):
         
         return {
             "level": points // 100 + 1,
-            "streak_days": 1, # 新用户默认为 1
+            "streak_days": 1, 
             "plants_count": len(completed_tasks),
             "water_drops": points,
             "points": points,
@@ -41,25 +41,24 @@ def get_child_stats(username: str):
         return {"error": str(e)}
 
 @router.get("/parent")
-def get_parent_stats(username: str):
-    """获取指定家长的聚合数据"""
+def get_parent_stats(family_id: str):
+    """获取指定家庭的家长端聚合数据"""
     try:
-        # 1. 该用户最近完成的任务
+        # 1. 家族最近完成的任务
         recent_res = supabase.table("tasks")\
             .select("*")\
             .filter("completed", "eq", True)\
-            .eq("username", username)\
+            .eq("family_id", family_id)\
             .order("created_at", desc=True)\
             .limit(5)\
             .execute()
         
-        # 2. 该用户本周任务概况
-        all_tasks = supabase.table("tasks").select("completed").eq("username", username).execute()
+        # 2. 家族本周任务概况
+        all_tasks = supabase.table("tasks").select("completed").eq("family_id", family_id).execute()
         total = len(all_tasks.data) if all_tasks.data else 0
         completed = len([t for t in all_tasks.data if t.get("completed")]) if all_tasks.data else 0
         rate = int((completed / total * 100)) if total > 0 else 0
         
-        # 3. 统计过去 7 天每天的完成量 (这里暂保持简单逻辑)
         weekly_data = [{"name": "周一", "value": 0}, {"name": "周二", "value": 0}, {"name": "周三", "value": 0}, {"name": "周四", "value": 0}, {"name": "周五", "value": 0}, {"name": "周六", "value": 0}, {"name": "周日", "value": 0}]
             
         return {
@@ -72,22 +71,20 @@ def get_parent_stats(username: str):
         return {"error": str(e)}
 
 @router.get("/history")
-def get_stats_history(username: str):
-    """获取指定用户过去 7 天的专注时长与完成量统计"""
+def get_stats_history(family_id: str):
+    """获取指定家庭过去 7 天的专注时长与完成量统计"""
     from datetime import datetime, timedelta
     try:
-        # 只获取当前用户的任务
         days_ago = datetime.now() - timedelta(days=7)
         tasks_res = supabase.table("tasks")\
             .select("completed_at, target_duration, task_type")\
             .eq("completed", True)\
-            .eq("username", username)\
+            .eq("family_id", family_id)\
             .gte("completed_at", days_ago.isoformat())\
             .execute()
         
         raw_data = tasks_res.data or []
         
-        # 初始化过去 7 天的容器
         history_map = {}
         for i in range(6, -1, -1):
             d_str = (datetime.now() - timedelta(days=i)).strftime("%m-%d")

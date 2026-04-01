@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, Plus, Star } from 'lucide-react';
+import { Settings2, Plus, Star, Target, Shield, Ship, CheckCircle2, ChevronRight, X, Sparkles } from 'lucide-react';
+import { Modal } from '../ui/Modal';
 import { API_URL } from '@/src/api_config';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
@@ -18,6 +19,7 @@ interface Task {
   title: string;
   points: number;
   icon: string;
+  username?: string;
   completed: boolean;
   task_type?: 'checkbox' | 'timer';
   target_duration?: number;
@@ -45,6 +47,8 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
   const [newTaskDuration, setNewTaskDuration] = useState<string | number>('30');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{ title: string, message: string, onConfirm: () => void } | null>(null);
   const [activeTimer, setActiveTimer] = useState<{ id: string, title: string, remaining: number, isPaused: boolean } | null>(null);
 
   const API_BASE = `${API_URL}/tasks`;
@@ -69,7 +73,8 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`${API_BASE}/?username=${user?.username}`);
+      const query = `family_id=${user?.family_id}&username=${user?.username}`;
+      const res = await fetch(`${API_BASE}/?${query}`);
       if (res.ok) setTasks(await res.json());
     } catch (e) { console.error('Failed to fetch tasks', e); }
     finally { setLoading(false); }
@@ -96,7 +101,11 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       const res = await fetch(`${API_BASE}/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: !task.completed })
+        body: JSON.stringify({
+          completed: !task.completed,
+          family_id: user?.family_id,
+          username: user?.username
+        })
       });
       if (res.ok && !task.completed) refreshPoints();
     } catch (error) {
@@ -111,6 +120,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          family_id: user?.family_id,
           username: user?.username,
           title, points, icon, completed: false, is_daily, task_type: type, target_duration: duration
         })
@@ -123,12 +133,17 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
     } catch (e) { console.error(e); }
   };
 
-  const deleteTask = async (id: string) => {
-    if (!window.confirm('确定要删除这个任务吗？')) return;
-    try {
-      const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchTasks();
-    } catch (e) { console.error(e); }
+  const deleteTask = (id: string) => {
+    setConfirmConfig({
+      title: '确认要删除吗？',
+      message: '删除后的任务无法找回，相关进度也会消失。',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+          if (res.ok) fetchTasks();
+        } catch (e) { console.error(e); }
+      }
+    });
   };
 
   const addTemplate = async () => {
@@ -149,12 +164,17 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
     } catch (e) { console.error(e); }
   };
 
-  const deleteTemplate = async (id: string) => {
-    if (!window.confirm('确定要删除这个挑战模板吗？')) return;
-    try {
-      const res = await fetch(`${API_URL}/tasks/templates/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchPresets();
-    } catch (e) { console.error(e); }
+  const deleteTemplate = (id: string) => {
+    setConfirmConfig({
+      title: '删除这个模板？',
+      message: '删除后，所有基于此模板的任务将不再能一键发布。',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`${API_URL}/tasks/templates/${id}`, { method: 'DELETE' });
+          if (res.ok) fetchPresets();
+        } catch (e) { console.error(e); }
+      }
+    });
   };
 
   const resetForm = () => {
@@ -215,24 +235,26 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            {tasks.map((task) => (
-              <motion.div
-                key={task.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                <TaskCard
-                  task={task}
-                  role={role}
-                  onToggle={() => toggleTask(task.id)}
-                  onStartTimer={() => setActiveTimer({ id: task.id, title: task.title, remaining: (task.target_duration || 30) * 60, isPaused: false })}
-                  onDelete={() => deleteTask(task.id)}
-                />
-              </motion.div>
-            ))}
+            {tasks
+              .filter(task => !task.username || task.username === user?.username)
+              .map((task) => (
+                <motion.div
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TaskCard
+                    task={task}
+                    role={role}
+                    onToggle={() => toggleTask(task.id)}
+                    onStartTimer={() => setActiveTimer({ id: task.id, title: task.title, remaining: (task.target_duration || 30) * 60, isPaused: false })}
+                    onDelete={() => deleteTask(task.id)}
+                  />
+                </motion.div>
+              ))}
           </AnimatePresence>
         )}
       </div>
@@ -286,6 +308,17 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
           />
         )}
       </AnimatePresence>
+
+      <Modal
+        isOpen={!!confirmConfig}
+        onClose={() => setConfirmConfig(null)}
+        onConfirm={() => confirmConfig?.onConfirm()}
+        title={confirmConfig?.title || '确认操作'}
+        message={confirmConfig?.message || '您确定要执行此操作吗？'}
+        confirmText="无情执行"
+        cancelText="我再想想"
+        type="danger"
+      />
     </div>
   );
 };

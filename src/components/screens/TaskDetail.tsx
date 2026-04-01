@@ -37,7 +37,11 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true, username: user?.username })
+        body: JSON.stringify({
+          completed: true,
+          family_id: user?.family_id,
+          username: user?.username
+        })
       });
       if (res.ok) {
         onBack();
@@ -83,7 +87,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
   useEffect(() => {
     const fetchTask = async () => {
       try {
-        const res = await fetch(`${API_URL}/tasks/${taskId}?username=${user?.username}`);
+        const res = await fetch(`${API_URL}/tasks/${taskId}?family_id=${user?.family_id}&username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setTask(data);

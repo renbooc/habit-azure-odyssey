@@ -25,7 +25,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/child?username=${user?.username}`);
+        const res = await fetch(`${API_URL}/stats/child?family_id=${user?.family_id}&username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -36,7 +36,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     };
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/history?username=${user?.username}`);
+        const res = await fetch(`${API_URL}/stats/history?family_id=${user?.family_id}&username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           // 确保返回的是数组
@@ -87,7 +87,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true, username: user?.username })
+        body: JSON.stringify({ completed: true, family_id: user?.family_id })
       });
       if (res.ok) {
         triggerConfetti();
