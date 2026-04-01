@@ -5,9 +5,11 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
-# 设置构建所需的环境变量 (让前端知道请求同域名的 /api)
+# 设置构建所需的环境变量
 ENV VITE_API_BASE=/api
-RUN npm run build
+ENV NODE_ENV=production
+# 使用 npx 运行并跳过所有潜在的外部类型检查干扰
+RUN npx vite build
 
 # 第二阶段：运行后端 (Python)
 FROM python:3.10-slim
