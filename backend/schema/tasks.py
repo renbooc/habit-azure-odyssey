@@ -5,6 +5,7 @@ from datetime import datetime
 class TaskBase(BaseModel):
     title: str
     points: int
+    username: Optional[str] = None
     icon: Optional[str] = "Star"
     completed: bool = False
     template_id: Optional[str] = None

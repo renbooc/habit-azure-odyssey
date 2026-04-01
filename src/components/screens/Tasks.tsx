@@ -32,7 +32,7 @@ interface TaskTemplate {
 }
 
 export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSelectTask?: (taskId: string) => void }) => {
-  const { refreshPoints } = useUser();
+  const { user, refreshPoints } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [presets, setPresets] = useState<TaskTemplate[]>([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -69,7 +69,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`${API_BASE}/`);
+      const res = await fetch(`${API_BASE}/?username=${user?.username}`);
       if (res.ok) setTasks(await res.json());
     } catch (e) { console.error('Failed to fetch tasks', e); }
     finally { setLoading(false); }
@@ -110,7 +110,10 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       const res = await fetch(`${API_BASE}/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, points, icon, completed: false, is_daily, task_type: type, target_duration: duration })
+        body: JSON.stringify({
+          username: user?.username,
+          title, points, icon, completed: false, is_daily, task_type: type, target_duration: duration
+        })
       });
       if (res.ok) {
         setIsAdding(false);

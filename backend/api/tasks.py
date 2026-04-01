@@ -49,23 +49,30 @@ def delete_task_template(template_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[TaskResponse])
-def get_all_tasks():
-    """获取所有任务列表"""
+def get_all_tasks(username: str):
+    """获取指定用户的任务列表（并自动生成当日挑战）"""
     try:
-        # Lazy spawn daily missions
+        # 针对该用户生成每日挑战 (Lazy spawn)
         import datetime
         today_str = datetime.datetime.now().strftime("%Y-%m-%d")
         dailies = supabase.table("task_templates").select("*").eq("is_daily", True).execute()
+        
         if dailies.data:
-            existing_today = supabase.table("tasks").select("template_id").not_.is_("template_id", "null").gte("created_at", f"{today_str}T00:00:00Z").execute()
-            existing_ids = set()
-            if existing_today.data:
-                existing_ids = {t["template_id"] for t in existing_today.data if t.get("template_id")}
-
+            # 检查该用户今天是否已经有了这些挑战
+            existing_today = supabase.table("tasks")\
+                .select("template_id")\
+                .eq("username", username)\
+                .not_.is_("template_id", "null")\
+                .gte("created_at", f"{today_str}T00:00:00Z")\
+                .execute()
+                
+            existing_ids = {t["template_id"] for t in existing_today.data if t.get("template_id")} if existing_today.data else set()
+ 
             to_insert = []
             for tmpl in dailies.data:
                 if tmpl["id"] not in existing_ids:
                     to_insert.append({
+                        "username": username,
                         "title": tmpl["title"],
                         "points": tmpl["points"],
                         "icon": tmpl["icon"],
@@ -77,7 +84,7 @@ def get_all_tasks():
             if to_insert:
                 supabase.table("tasks").insert(to_insert).execute()
                 
-        return TaskService.get_tasks()
+        return TaskService.get_tasks(username)
     except Exception as e:
         import traceback
         traceback.print_exc()

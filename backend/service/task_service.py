@@ -5,8 +5,12 @@ from datetime import datetime
 
 class TaskService:
     @staticmethod
-    def get_tasks() -> List[Dict[str, Any]]:
-        response = supabase.table("tasks").select("*").order("created_at", desc=True).execute()
+    def get_tasks(username: str) -> List[Dict[str, Any]]:
+        response = supabase.table("tasks")\
+            .select("*")\
+            .eq("username", username)\
+            .order("created_at", desc=True)\
+            .execute()
         return response.data
 
     @staticmethod

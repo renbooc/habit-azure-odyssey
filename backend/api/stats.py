@@ -5,40 +5,33 @@ from typing import Dict, Any, List
 router = APIRouter()
 
 @router.get("/child")
-def get_child_stats():
-    """获取孩子端面板数据"""
+def get_child_stats(username: str):
+    """获取指定用户的孩子端面板数据"""
     try:
-        # Get all tasks for both points calculation and quick-start recommendations
-        tasks_res = supabase.table("tasks").select("*").execute()
+        # 只获取当前用户的任务
+        tasks_res = supabase.table("tasks").select("*").eq("username", username).execute()
         tasks_data = tasks_res.data or []
         
-        # 积分逻辑：显式累加，确保 null 值被替换为默认 10 分
+        # 积分逻辑：统计该用户的完成情况
         completed_tasks = [t for t in tasks_data if t.get("completed")]
         gross_points = 0
         for t in completed_tasks:
-            try:
-                # Force points to integer, handle None and string cases
-                p_val = t.get("points")
-                if p_val is None:
-                    gross_points += 10
-                else:
-                    gross_points += int(p_val)
-            except (ValueError, TypeError):
-                gross_points += 10 # Fallback 
+            p_val = t.get("points")
+            gross_points += int(p_val) if p_val is not None else 10
         
-        # 计算已被消耗的积分
-        purchases_res = supabase.table("store_purchases").select("price").execute()
+        # 统计该用户的购买消耗
+        purchases_res = supabase.table("store_purchases").select("price").eq("username", username).execute()
         spent_points = sum(p.get("price", 0) for p in (purchases_res.data or []))
         
         points = max(0, gross_points - spent_points)
         
-        # 获取未完成的任务作为快速开始推荐
+        # 获取该用户的未完成任务作为推荐
         uncompleted_tasks = [t for t in tasks_data if not t.get("completed")]
         quick_tasks = uncompleted_tasks[:2]
         
         return {
             "level": points // 100 + 1,
-            "streak_days": 12, # 暂模拟连续天数
+            "streak_days": 1, # 新用户默认为 1
             "plants_count": len(completed_tasks),
             "water_drops": points,
             "points": points,
@@ -48,30 +41,26 @@ def get_child_stats():
         return {"error": str(e)}
 
 @router.get("/parent")
-def get_parent_stats():
-    """获取家长端聚合数据"""
-    from datetime import datetime, timedelta
+def get_parent_stats(username: str):
+    """获取指定家长的聚合数据"""
     try:
-        # 1. 最近完成的任务
+        # 1. 该用户最近完成的任务
         recent_res = supabase.table("tasks")\
             .select("*")\
             .filter("completed", "eq", True)\
+            .eq("username", username)\
             .order("created_at", desc=True)\
             .limit(5)\
             .execute()
         
-        # 2. 本周任务概况
-        all_tasks = supabase.table("tasks").select("completed").execute()
+        # 2. 该用户本周任务概况
+        all_tasks = supabase.table("tasks").select("completed").eq("username", username).execute()
         total = len(all_tasks.data) if all_tasks.data else 0
         completed = len([t for t in all_tasks.data if t.get("completed")]) if all_tasks.data else 0
         rate = int((completed / total * 100)) if total > 0 else 0
         
-        # 3. 模拟周数据 (可与 history 逻辑整合)
-        weekly_data = []
-        days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-        for d in days:
-            import random
-            weekly_data.append({"name": d, "value": random.randint(1, 10)})
+        # 3. 统计过去 7 天每天的完成量 (这里暂保持简单逻辑)
+        weekly_data = [{"name": "周一", "value": 0}, {"name": "周二", "value": 0}, {"name": "周三", "value": 0}, {"name": "周四", "value": 0}, {"name": "周五", "value": 0}, {"name": "周六", "value": 0}, {"name": "周日", "value": 0}]
             
         return {
             "completed_tasks": completed,
@@ -83,16 +72,16 @@ def get_parent_stats():
         return {"error": str(e)}
 
 @router.get("/history")
-def get_stats_history():
-    """获取过去 7 天的专注时长与完成量统计"""
+def get_stats_history(username: str):
+    """获取指定用户过去 7 天的专注时长与完成量统计"""
     from datetime import datetime, timedelta
     try:
-        # 获取过去 7 天的任务
+        # 只获取当前用户的任务
         days_ago = datetime.now() - timedelta(days=7)
-        # 过滤已完成且有完成时间的项目
         tasks_res = supabase.table("tasks")\
             .select("completed_at, target_duration, task_type")\
             .eq("completed", True)\
+            .eq("username", username)\
             .gte("completed_at", days_ago.isoformat())\
             .execute()
         
@@ -107,7 +96,6 @@ def get_stats_history():
         for t in raw_data:
             if not t.get("completed_at"):
                 continue
-            # 处理 Supabase 返回的时间字符串
             try:
                 dt = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
                 date_key = dt.strftime("%m-%d")

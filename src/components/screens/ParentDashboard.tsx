@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useUser } from '@/src/context/UserContext';
 import { Card } from '@/src/components/ui/Card';
 import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
@@ -10,6 +11,7 @@ const iconMap: Record<string, any> = {
 };
 
 export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) => void }) => {
+  const { user } = useUser();
   const [stats, setStats] = useState({
     completed_tasks: 0,
     completion_rate: 0,
@@ -31,7 +33,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/parent`);
+        const res = await fetch(`${API_URL}/stats/parent?username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -43,7 +45,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
 
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${API_URL}/achievements/child`);
+        const res = await fetch(`${API_URL}/achievements/child?username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setBadgeCount(data.unlocked_count || 0);
@@ -68,7 +70,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
       const res = await fetch(`${API_URL}/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false })
+        body: JSON.stringify({ completed: false, username: user?.username })
       });
       if (res.ok) {
         // Optimistically remove from recent tasks

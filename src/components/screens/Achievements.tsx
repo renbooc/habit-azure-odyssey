@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/src/components/ui/Card';
+import { useUser } from '@/src/context/UserContext';
 import { API_URL } from '@/src/api_config';
 import { Rocket, Moon, Lock, Droplets, BookOpen, Brain, TreePine, Zap, BadgeCheck, Gift, CheckCircle, Clock, Star, Puzzle } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -9,6 +10,7 @@ const iconMap: Record<string, any> = {
 };
 
 export const Achievements = () => {
+  const { user } = useUser();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeBadge, setActiveBadge] = useState<any>(null);
@@ -16,7 +18,7 @@ export const Achievements = () => {
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
-        const res = await fetch(`${API_URL}/achievements/child`);
+        const res = await fetch(`${API_URL}/achievements/child?username=${user?.username}`);
         if (res.ok) {
           const json = await res.json();
           setData(json);

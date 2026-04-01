@@ -10,7 +10,7 @@ import { TrendingUp } from 'lucide-react';
 import { useUser } from '@/src/context/UserContext';
 
 export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string) => void }) => {
-  const { refreshPoints } = useUser();
+  const { user, refreshPoints } = useUser();
   const [stats, setStats] = useState<any>({
     level: 1,
     streak_days: 0,
@@ -25,7 +25,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/child`);
+        const res = await fetch(`${API_URL}/stats/child?username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -36,7 +36,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     };
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/history`);
+        const res = await fetch(`${API_URL}/stats/history?username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           // 确保返回的是数组
@@ -87,7 +87,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true })
+        body: JSON.stringify({ completed: true, username: user?.username })
       });
       if (res.ok) {
         triggerConfetti();

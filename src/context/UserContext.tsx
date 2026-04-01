@@ -26,8 +26,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [points, setPoints] = useState(0);
 
     const refreshPoints = useCallback(async () => {
+        // 如果没有用户登录，不需要刷新
+        const saved = localStorage.getItem('currentUser');
+        const currentUser = user || (saved ? JSON.parse(saved) : null);
+        if (!currentUser) return;
+
         try {
-            const res = await fetch(`${API_URL}/stats/child`);
+            const res = await fetch(`${API_URL}/stats/child?username=${currentUser.username}`);
             if (res.ok) {
                 const data = await res.json();
                 setPoints(data.points || 0);
@@ -35,13 +40,14 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (err) {
             console.error('Failed to refresh points:', err);
         }
-    }, []);
+    }, [user]);
 
     const login = (userData: any) => {
         setUser(userData);
         setRole(userData.role);
         localStorage.setItem('currentUser', JSON.stringify(userData));
-        refreshPoints();
+        // 登录后稍等片刻待 state 更新或直接基于 userData 刷新
+        setTimeout(() => refreshPoints(), 100);
     };
 
     const logout = () => {

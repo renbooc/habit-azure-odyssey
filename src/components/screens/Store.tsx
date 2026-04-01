@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useUser } from '@/src/context/UserContext';
 import { API_URL } from '@/src/api_config';
 import { Card } from '@/src/components/ui/Card';
 import { ShoppingBag, Lightbulb, Gamepad2, BookOpen, Tv, Stars, Gift, Plus, Trash2 } from 'lucide-react';
@@ -28,6 +29,7 @@ interface StoreProps {
 }
 
 export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps) => {
+  const { user } = useUser();
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/store/items`);
+      const res = await fetch(`${API_URL}/store/items?username=${user?.username}`);
       if (res.ok) {
         const data = await res.json();
         const enhancedData = data.map((item: any) => ({
@@ -230,7 +232,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
                         const res = await fetch(`${API_URL}/store/purchase`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ item_id: item.id, price: item.price })
+                          body: JSON.stringify({ item_id: item.id, price: item.price, username: user?.username })
                         });
                         if (res.ok) {
                           showToast('🎉 兑换成功！');

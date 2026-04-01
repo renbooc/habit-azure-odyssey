@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
+import { useUser } from '@/src/context/UserContext';
 import { API_URL } from '@/src/api_config';
 import { ArrowLeft, Check, Pause, Play, BadgeCheck, BookOpen, Bed, Leaf, Droplets, Puzzle } from 'lucide-react';
 
@@ -19,6 +20,7 @@ const icons = {
 } as const;
 
 export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
+  const { user } = useUser();
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
@@ -35,7 +37,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
       const res = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: true })
+        body: JSON.stringify({ completed: true, username: user?.username })
       });
       if (res.ok) {
         onBack();
@@ -81,7 +83,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
   useEffect(() => {
     const fetchTask = async () => {
       try {
-        const res = await fetch(`${API_URL}/tasks/${taskId}`);
+        const res = await fetch(`${API_URL}/tasks/${taskId}?username=${user?.username}`);
         if (res.ok) {
           const data = await res.json();
           setTask(data);
