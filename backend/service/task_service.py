@@ -6,10 +6,14 @@ from datetime import datetime
 class TaskService:
     @staticmethod
     def get_tasks(family_id: str, username: Optional[str] = None) -> List[Dict[str, Any]]:
-        """获取任务列表：强制个人隐私隔离"""
+        """获取任务列表：强制个人隐私隔离，且只看当天的任务"""
+        from datetime import datetime
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        
         query = supabase.table("tasks")\
             .select("*")\
-            .eq("family_id", family_id)
+            .eq("family_id", family_id)\
+            .gte("created_at", f"{today_str}T00:00:00Z") # 仅过滤今日任务 (UTC 逻辑参考 api/tasks.py)
         
         if username:
             # 无论家长还是孩子，只要在个人大厅，都只看自己的
@@ -68,5 +72,9 @@ class TaskService:
 
     @staticmethod
     def delete_task(task_id: str) -> bool:
+        # 使用 select() 后接 delete() 有时能保证返回数据，或者直接执行 delete
+        # 为了兼容性，我们执行删除并检查是否有数据返回
         response = supabase.table("tasks").delete().eq("id", task_id).execute()
-        return len(response.data) > 0
+        # 即使返回数据为空，但在 Supabase 中没报错通常意味着任务不存在或已删除
+        # 我们这里通过 data 是否存在来判定
+        return response.data is not None

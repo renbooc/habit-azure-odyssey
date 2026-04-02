@@ -21,33 +21,57 @@ def get_level_data(points: int) -> Dict[str, Any]:
 
 @router.get("/child")
 def get_child_stats(family_id: str, username: str):
-    """获取指定家庭中特定用户的子端面板数据 (注入动态称号)"""
+    """获取指定家庭中特定用户的子端面板数据 (注入动态称号与实时连击)"""
+    from datetime import datetime, timedelta, timezone
+    tz_plus8 = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz_plus8)
+    
     try:
         tasks_res = supabase.table("tasks").select("*").eq("family_id", family_id).eq("username", username).execute()
         tasks_data = tasks_res.data or []
         completed_tasks = [t for t in tasks_data if t.get("completed")]
         
+        # 1. 经验与等级计算
         gross = sum(int(t.get("points", 10)) for t in completed_tasks)
         purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", username).execute()
         spent = sum(p.get("price", 0) for p in (purchases_res.data or []))
         points = max(0, gross - spent)
-        
-        # 应用动态等级系统 (基于永不降低的总阅历 gross)
         lvl_info = get_level_data(gross)
         
+        # 2. 实时连击天数计算 (基于本地 +8 时区)
+        completed_dates = set()
+        for t in completed_tasks:
+            if t.get("completed_at"):
+                # 转换 UTC 到本地
+                dt_utc = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
+                dt_local = dt_utc.astimezone(tz_plus8)
+                completed_dates.add(dt_local.date())
+        
+        streak = 0
+        check_date = now_local.date()
+        # 如果今天没打卡，从昨天开始算（允许今天还没来得及打卡）
+        if check_date not in completed_dates:
+            check_date -= timedelta(days=1)
+            
+        while check_date in completed_dates:
+            streak += 1
+            check_date -= timedelta(days=1)
+            
         uncompleted = [t for t in tasks_data if not t.get("completed")]
         return {
             "level": lvl_info["level"],
             "level_title": lvl_info["title"],
             "level_emoji": lvl_info["emoji"],
             "total_xp": gross,
-            "points": points, # 这里依然是余额，用于商城购买
-            "streak_days": 1, 
+            "points": points,
+            "streak_days": streak, 
             "plants_count": len(completed_tasks),
             "water_drops": points,
             "quick_tasks": uncompleted[:2]
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 @router.get("/parent")
@@ -82,29 +106,38 @@ def get_parent_stats(family_id: str):
 
 @router.get("/history")
 def get_stats_history(family_id: str, username: str):
-    """获取指定用户过去 7 天的统计 (隔离模式)"""
-    from datetime import datetime, timedelta
+    """获取指定用户过去 7 天的统计 (修复时区漂移)"""
+    from datetime import datetime, timedelta, timezone
+    tz_plus8 = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz_plus8)
+    
     try:
-        days_ago = datetime.now() - timedelta(days=7)
+        # 获取 7 天前的时间点 (UTC)
+        days_ago_utc = (now_local - timedelta(days=7)).astimezone(timezone.utc)
+        
         tasks_res = supabase.table("tasks")\
             .select("completed_at, target_duration, task_type")\
             .eq("completed", True)\
             .eq("family_id", family_id)\
             .eq("username", username)\
-            .gte("completed_at", days_ago.isoformat())\
+            .gte("completed_at", days_ago_utc.isoformat())\
             .execute()
         
         raw_data = tasks_res.data or []
         history_map = {}
+        # 生成本地日期的 7 天坐标
         for i in range(6, -1, -1):
-            d_str = (datetime.now() - timedelta(days=i)).strftime("%m-%d")
+            d_str = (now_local - timedelta(days=i)).strftime("%m-%d")
             history_map[d_str] = {"date": d_str, "minutes": 0, "count": 0}
             
         for t in raw_data:
             if not t.get("completed_at"): continue
             try:
-                dt = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
-                date_key = dt.strftime("%m-%d")
+                # 转换 UTC 时间到 本地时区 进行归类
+                dt_utc = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
+                dt_local = dt_utc.astimezone(tz_plus8)
+                date_key = dt_local.strftime("%m-%d")
+                
                 if date_key in history_map:
                     history_map[date_key]["count"] += 1
                     if t.get("task_type") == "timer":
@@ -113,6 +146,8 @@ def get_stats_history(family_id: str, username: str):
         
         return list(history_map.values())
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 @router.get("/leaderboard")

@@ -73,8 +73,15 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const fetchTasks = async () => {
     try {
-      const query = `family_id=${user?.family_id}&username=${user?.username}`;
-      const res = await fetch(`${API_BASE}/?${query}`);
+      // 如果是家长视角，不再传递 username，以拉取全家今日任务
+      const queryParams = new URLSearchParams({
+        family_id: user?.family_id || ''
+      });
+      if (role === 'child' && user?.username) {
+        queryParams.append('username', user.username);
+      }
+
+      const res = await fetch(`${API_BASE}/?${queryParams.toString()}`);
       if (res.ok) setTasks(await res.json());
     } catch (e) { console.error('Failed to fetch tasks', e); }
     finally { setLoading(false); }
@@ -236,7 +243,6 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
         ) : (
           <AnimatePresence mode="popLayout">
             {tasks
-              .filter(task => !task.username || task.username === user?.username)
               .map((task) => (
                 <motion.div
                   key={task.id}
