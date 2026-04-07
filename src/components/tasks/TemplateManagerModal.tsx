@@ -143,7 +143,7 @@ export const TemplateManagerModal = ({
                                 </div>
                                 <button
                                     onClick={() => onDelete(p.id)}
-                                    className="p-2 text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-on-surface-variant/40 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                                 >
                                     <Trash2 size={16} />
                                 </button>

@@ -82,7 +82,18 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       }
 
       const res = await fetch(`${API_BASE}/?${queryParams.toString()}`);
-      if (res.ok) setTasks(await res.json());
+      if (res.ok) {
+        let fetchedTasks = await res.json();
+        // 如果是家长视角，针对全家所有成员分发的多份冗余任务进行名字上的去重展示
+        if (role === 'parent') {
+          const uniqueTitleMap = new Map();
+          fetchedTasks.forEach((t: any) => {
+            if (!uniqueTitleMap.has(t.title)) uniqueTitleMap.set(t.title, t);
+          });
+          fetchedTasks = Array.from(uniqueTitleMap.values());
+        }
+        setTasks(fetchedTasks);
+      }
     } catch (e) { console.error('Failed to fetch tasks', e); }
     finally { setLoading(false); }
   };
@@ -147,7 +158,10 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       onConfirm: async () => {
         try {
           const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
-          if (res.ok) fetchTasks();
+          if (res.ok) {
+            fetchTasks();
+            setConfirmConfig(null);
+          }
         } catch (e) { console.error(e); }
       }
     });
@@ -178,7 +192,10 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       onConfirm: async () => {
         try {
           const res = await fetch(`${API_URL}/tasks/templates/${id}`, { method: 'DELETE' });
-          if (res.ok) fetchPresets();
+          if (res.ok) {
+            fetchPresets();
+            setConfirmConfig(null);
+          }
         } catch (e) { console.error(e); }
       }
     });

@@ -72,9 +72,32 @@ class TaskService:
 
     @staticmethod
     def delete_task(task_id: str) -> bool:
-        # 使用 select() 后接 delete() 有时能保证返回数据，或者直接执行 delete
-        # 为了兼容性，我们执行删除并检查是否有数据返回
-        response = supabase.table("tasks").delete().eq("id", task_id).execute()
-        # 即使返回数据为空，但在 Supabase 中没报错通常意味着任务不存在或已删除
-        # 我们这里通过 data 是否存在来判定
+        # 先抓取该任务的信息，用来定位它的“平行副本”
+        target_res = supabase.table("tasks").select("title, family_id, created_at").eq("id", task_id).execute()
+        
+        if not target_res.data:
+            return False
+            
+        target_task = target_res.data[0]
+        title = target_task.get("title")
+        family_id = target_task.get("family_id")
+        created_at_str = target_task.get("created_at")
+        
+        if not title or not family_id or not created_at_str:
+            # 安全降级：如果缺关键信息，就只删自己
+            response = supabase.table("tasks").delete().eq("id", task_id).execute()
+            return response.data is not None
+            
+        # 截取日期部分 (YYYY-MM-DD)，用来确保我们只删除同一天分发的平行任务，不波及历史记录
+        date_prefix = str(created_at_str).split("T")[0]
+        
+        # 将当天分配给所有家庭成员的这个同名任务全部一起移除（同步孩子端）
+        # 注意: 数据库 created_at 是 timestamp 类型，不能直接用 like，需使用时间区间 (gte 和 lte)
+        response = supabase.table("tasks").delete()\
+            .eq("family_id", family_id)\
+            .eq("title", title)\
+            .gte("created_at", f"{date_prefix}T00:00:00Z")\
+            .lte("created_at", f"{date_prefix}T23:59:59Z")\
+            .execute()
+            
         return response.data is not None

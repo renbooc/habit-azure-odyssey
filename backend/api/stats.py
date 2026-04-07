@@ -32,11 +32,19 @@ def get_child_stats(family_id: str, username: str):
         completed_tasks = [t for t in tasks_data if t.get("completed")]
         
         # 1. 经验与等级计算
-        gross = sum(int(t.get("points", 10)) for t in completed_tasks)
-        purchases_res = supabase.table("store_purchases").select("price").eq("family_id", family_id).eq("username", username).execute()
-        spent = sum(p.get("price", 0) for p in (purchases_res.data or []))
-        points = max(0, gross - spent)
-        lvl_info = get_level_data(gross)
+        base_xp = sum(int(t.get("points") or 10) for t in completed_tasks)
+        purchases_res = supabase.table("store_purchases").select("item_id, price").eq("family_id", family_id).eq("username", username).execute()
+        purchases = purchases_res.data or []
+        
+        # 惩罚类直接削弱总阅历(历史经验值)
+        penalty_spent = sum(int(p.get("price") or 0) for p in purchases if str(p.get("item_id", "")).startswith("罚单_"))
+        total_xp = max(0, base_xp - penalty_spent)
+        
+        # 花费(包含惩罚与正常兑换) 扣除全部积分余额
+        total_spent = sum(int(p.get("price") or 0) for p in purchases)
+        points = max(0, base_xp - total_spent)
+        
+        lvl_info = get_level_data(total_xp)
         
         # 2. 实时连击天数计算 (基于本地 +8 时区)
         completed_dates = set()
@@ -62,7 +70,7 @@ def get_child_stats(family_id: str, username: str):
             "level": lvl_info["level"],
             "level_title": lvl_info["title"],
             "level_emoji": lvl_info["emoji"],
-            "total_xp": gross,
+            "total_xp": total_xp,
             "points": points,
             "streak_days": streak, 
             "plants_count": len(completed_tasks),
@@ -160,9 +168,19 @@ def get_family_leaderboard(family_id: str):
         for user in all_users:
             uname = user["username"]
             tasks_res = supabase.table("tasks").select("points").eq("family_id", family_id).eq("username", uname).eq("completed", True).execute()
+            purchases_res = supabase.table("store_purchases").select("item_id, price").eq("family_id", family_id).eq("username", uname).execute()
             
-            # 使用总阅历进行排名
-            total_xp = sum(int(t.get("points", 10)) for t in (tasks_res.data or []))
+            # 使用基础经验减去任何惩处罚单，得出真实的排名总阅历
+            base_xp = sum(int(t.get("points") or 10) for t in (tasks_res.data or []))
+            purchases = purchases_res.data or []
+            
+            # 花费(包含惩罚与正常兑换) 扣除全部积分余额
+            total_spent = sum(int(p.get("price") or 0) for p in purchases)
+            points = max(0, base_xp - total_spent)
+            
+            # 总阅历仍用于计算等级
+            penalty_spent = sum(int(p.get("price") or 0) for p in purchases if str(p.get("item_id", "")).startswith("罚单_"))
+            total_xp = max(0, base_xp - penalty_spent)
             
             # 使用统一等级算法
             lvl_info = get_level_data(total_xp)
@@ -172,12 +190,69 @@ def get_family_leaderboard(family_id: str):
                 "role": user["role"],
                 "avatar": user.get("avatar"),
                 "total_xp": total_xp,
+                "points": points,
                 "level": lvl_info["level"],
                 "level_title": lvl_info["title"]
             })
             
-        # 按【总阅历】从高到低排序，确立家庭地位
-        leaderboard.sort(key=lambda x: x["total_xp"], reverse=True)
+        # 按【当前可用积分】进行全家排行
+        leaderboard.sort(key=lambda x: x["points"], reverse=True)
         return leaderboard
     except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/transactions")
+def get_transactions(family_id: str, username: str):
+    """获取积分变动流水记录"""
+    try:
+        # 获取积分增加记录 (已完成的任务)
+        tasks_res = supabase.table("tasks")\
+            .select("title, points, completed_at")\
+            .eq("completed", True)\
+            .eq("family_id", family_id)\
+            .eq("username", username)\
+            .execute()
+            
+        # 获取积分消耗记录 (商城购买 / 处分)
+        purchases_res = supabase.table("store_purchases")\
+            .select("item_id, price, created_at")\
+            .eq("family_id", family_id)\
+            .eq("username", username)\
+            .execute()
+            
+        # 获取所有 store_items 用于将 UUID 映射为商品名称
+        items_res = supabase.table("store_items").select("id, name").execute()
+        item_dict = {item["id"]: item["name"] for item in (items_res.data or [])}
+            
+        transactions = []
+        
+        for t in (tasks_res.data or []):
+            if t.get("completed_at"):
+                transactions.append({
+                    "title": t.get("title", "完成任务"),
+                    "amount": int(t.get("points") or 0),
+                    "type": "earn",
+                    "time": t.get("completed_at")
+                })
+                
+        for p in (purchases_res.data or []):
+            if p.get("created_at"):
+                raw_item_id = p.get("item_id", "商城兑换")
+                # 尝试通过 UUID 获取真实商品名称，若找不到（比如罚单直接存的是文本），则兜底使用 raw_item_id
+                display_title = item_dict.get(raw_item_id, raw_item_id)
+                
+                transactions.append({
+                    "title": display_title,
+                    "amount": -int(p.get("price") or 0),
+                    "type": "spend",
+                    "time": p.get("created_at")
+                })
+                
+        # 按时间倒序排序 (最新的流水在最前面)
+        transactions.sort(key=lambda x: x["time"], reverse=True)
+        
+        return transactions
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}

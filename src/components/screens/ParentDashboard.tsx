@@ -3,9 +3,11 @@ import { useUser } from '@/src/context/UserContext';
 import { Card } from '@/src/components/ui/Card';
 import { API_URL } from '@/src/api_config';
 import { Button } from '@/src/components/ui/Button';
+import { Input } from '@/src/components/ui/Input';
 import { cn } from '@/src/lib/utils';
+import { AnimatePresence, motion } from 'motion/react';
 import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
-import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal, User } from 'lucide-react';
+import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal, User, AlertTriangle } from 'lucide-react';
 
 const iconMap: Record<string, any> = {
   BookOpen, Trash2, Moon, Trophy, Star, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed
@@ -35,47 +37,53 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   const [badgeCount, setBadgeCount] = useState(0);
   const [recentBadges, setRecentBadges] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [selectedChild, setSelectedChild] = useState<string>('');
+  const [punishModalConfig, setPunishModalConfig] = useState<{ name: string, amount: number, target: string } | null>(null);
+  const [punishReason, setPunishReason] = useState("");
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch(`${API_URL}/stats/parent?family_id=${user?.family_id}`);
-        if (res.ok) setStats(await res.json());
-      } catch (err) { console.error('获取家长统计数据失败', err); }
-    };
+  const fetchAllData = async () => {
+    if (!user) return;
+    try {
+      const [statsRes, personalRes, achieveRes, leaderRes] = await Promise.all([
+        fetch(`${API_URL}/stats/parent?family_id=${user.family_id}`),
+        fetch(`${API_URL}/stats/child?family_id=${user.family_id}&username=${user.username}`),
+        fetch(`${API_URL}/achievements/child?family_id=${user.family_id}&username=${user.username}`),
+        fetch(`${API_URL}/stats/leaderboard?family_id=${user.family_id}`)
+      ]);
 
-    const fetchPersonalStats = async () => {
-      try {
-        const res = await fetch(`${API_URL}/stats/child?family_id=${user?.family_id}&username=${user?.username}`);
-        if (res.ok) setPersonalStats(await res.json());
-      } catch (err) { console.error('获取个人统计数据失败', err); }
-    };
-
-    const fetchAchievements = async () => {
-      try {
-        const res = await fetch(`${API_URL}/achievements/child?family_id=${user?.family_id}&username=${user?.username}`);
-        if (res.ok) {
-          const data = await res.json();
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        if (!data.error) setStats(data);
+      }
+      if (personalRes.ok) {
+        const data = await personalRes.json();
+        if (!data.error) setPersonalStats(data);
+      }
+      if (achieveRes.ok) {
+        const data = await achieveRes.json();
+        if (!data.error) {
           setBadgeCount(data.unlocked_count || 0);
           if (data.badges) {
-            const unlocked = data.badges.filter((b: any) => b.unlocked);
-            setRecentBadges(unlocked.slice(-2));
+            setRecentBadges(data.badges.filter((b: any) => b.unlocked).slice(-2));
           }
         }
-      } catch (err) { console.error('获取成就数据失败', err); }
-    };
+      }
+      if (leaderRes.ok) {
+        const data = await leaderRes.json();
+        if (Array.isArray(data)) setLeaderboard(data);
+      }
+    } catch (e) {
+      console.error("获取家庭实时数据失败", e);
+    }
+  };
 
-    const fetchLeaderboard = async () => {
-      try {
-        const res = await fetch(`${API_URL}/stats/leaderboard?family_id=${user?.family_id}`);
-        if (res.ok) setLeaderboard(await res.json());
-      } catch (err) { console.error('获取排行榜失败', err); }
-    };
-
-    fetchStats();
-    fetchPersonalStats();
-    fetchAchievements();
-    fetchLeaderboard();
+  useEffect(() => {
+    fetchAllData();
+    // 开启 5 秒一次的轮询，作为"英雄榜"和其他数据的实时更新机制
+    const pollInterval = setInterval(() => {
+      fetchAllData();
+    }, 5000);
+    return () => clearInterval(pollInterval);
   }, [user]);
 
   const uncompleteTask = async (id: string) => {
@@ -93,9 +101,48 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
           recent_tasks: prev.recent_tasks.filter(t => t.id !== id),
           completed_tasks: Math.max(0, prev.completed_tasks - 1)
         }));
+        // 手动干预后立即触发一遍全体数据刷新（包括排行榜降级）
+        fetchAllData();
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handlePenalize = (penaltyName: string, amount: number) => {
+    const childrenList = leaderboard.filter(p => p.role === 'child');
+    const targetChild = selectedChild || (childrenList.length > 0 ? childrenList[0].username : null);
+
+    if (!targetChild) return alert("没有可惩罚的孩子！");
+
+    setPunishModalConfig({ name: penaltyName, amount, target: targetChild });
+    setPunishReason("");
+  };
+
+  const confirmPenalize = async () => {
+    if (!punishModalConfig) return;
+    try {
+      const res = await fetch(`${API_URL}/users/${punishModalConfig.target}/penalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          family_id: user?.family_id,
+          penalty_name: punishModalConfig.name,
+          amount: punishModalConfig.amount,
+          reason: punishReason
+        })
+      });
+      if (res.ok) {
+        alert("🚨 惩罚已生效，积分已被扣除！");
+        window.location.reload();
+      } else {
+        alert("操作失败！");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("网络错误");
+    } finally {
+      setPunishModalConfig(null);
     }
   };
 
@@ -147,7 +194,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
                 tick={{ fontSize: 10, fontWeight: 600, fill: '#73777b' }}
               />
               <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                {stats.weekly_data.map((entry, index) => (
+                {(stats.weekly_data || []).map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={index === 6 ? '#76C893' : (index % 2 === 0 ? '#FFD1B3' : '#FF8C42')}
@@ -194,7 +241,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         </div>
 
         <Card className="p-2 bg-surface-container-low border-none space-y-1">
-          {leaderboard.length === 0 ? (
+          {!Array.isArray(leaderboard) || leaderboard.length === 0 ? (
             <p className="text-center py-6 text-on-surface-variant/40 text-sm italic font-bold">暂无排名数据...</p>
           ) : leaderboard.map((player, index) => (
             <div
@@ -224,13 +271,13 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 justify-end">
-                  <span className="text-lg font-black text-primary italic" title="总阅历积分">{player.total_xp}</span>
-                  <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">xp</span>
+                  <span className="text-lg font-black text-primary italic" title="当前可用积分">{player.points}</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">pts</span>
                 </div>
                 <div className="w-16 h-1 bg-surface-container-high rounded-full mt-1 overflow-hidden">
                   <div
                     className="h-full bg-primary"
-                    style={{ width: `${Math.min(100, (player.total_xp / (leaderboard[0]?.total_xp || 1)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (player.points / (leaderboard[0]?.points || 1)) * 100)}%` }}
                   />
                 </div>
               </div>
@@ -249,9 +296,9 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
           </button>
         </div>
         <div className="space-y-4">
-          {stats.recent_tasks.length === 0 ? (
+          {!stats.recent_tasks || stats.recent_tasks.length === 0 ? (
             <p className="text-center text-on-surface-variant/60 py-4">暂无已完成的任务</p>
-          ) : stats.recent_tasks.map((task, i) => (
+          ) : stats.recent_tasks.map((task: any, i: number) => (
             <Card key={i} className={`p-6 flex items-center justify-between border-l-4 border-primary`}>
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary`}>
@@ -281,6 +328,72 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         </div>
       </section>
 
+      {/* Punishment Panel */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="text-red-500" size={24} />
+          <h2 className="text-on-primary-container font-black text-xl text-red-600">快捷惩戒中心</h2>
+        </div>
+        <Card className="p-6 border-red-500/20 bg-red-50/50 space-y-6">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+            <h3 className="font-bold text-red-900 border-l-4 border-red-500 pl-2">选择处分对象:</h3>
+            <div className="flex gap-2 flex-wrap">
+              {leaderboard.filter(p => p.role === 'child').length === 0 ? (
+                <span className="text-sm text-red-400">目前没有数据...</span>
+              ) : (
+                leaderboard.filter(p => p.role === 'child').map(child => {
+                  const childrenList = leaderboard.filter(c => c.role === 'child');
+                  const isSelected = selectedChild === child.username || (!selectedChild && childrenList.length > 0 && childrenList[0].username === child.username);
+                  return (
+                    <button
+                      key={child.username}
+                      onClick={() => setSelectedChild(child.username)}
+                      className={cn(
+                        "px-4 py-2 rounded-full font-bold text-sm transition-all border",
+                        isSelected
+                          ? "bg-red-500 text-white border-red-500 shadow-md"
+                          : "bg-white text-red-500 border-red-200 hover:bg-red-50"
+                      )}
+                    >
+                      <User size={14} className="inline mr-1 -mt-0.5" />
+                      {child.username}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { name: '警告', points: 10, bg: 'bg-orange-100 hover:bg-orange-200 border-orange-200', text: 'text-orange-700' },
+              { name: '严重警告', points: 30, bg: 'bg-red-100 hover:bg-red-200 border-red-200', text: 'text-red-700' },
+              { name: '记小过', points: 50, bg: 'bg-rose-100 hover:bg-rose-200 border-rose-300', text: 'text-rose-800' },
+              { name: '记大过', points: 100, bg: 'bg-red-600 hover:bg-red-700 border-red-700 text-white', text: 'text-red-50', whiteText: true }
+            ].map(penalty => (
+              <button
+                key={penalty.name}
+                onClick={() => handlePenalize(penalty.name, penalty.points)}
+                className={cn(
+                  "p-3 rounded-xl border transition-all active:scale-95 flex flex-col items-center justify-center gap-1 group",
+                  penalty.bg
+                )}
+              >
+                <span className={cn("font-black text-lg", penalty.whiteText ? "text-white" : penalty.text)}>
+                  {penalty.name}
+                </span>
+                <span className={cn("text-[10px] font-bold opacity-80 uppercase tracking-widest", penalty.text)}>
+                  扣 {penalty.points} PTS
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-red-500/70 font-bold italic text-center">
+            ⚠️ 注：处分将立即扣除孩子身上已拥有的积分。罚单会自动记录，但不会削弱历史总阅历。
+          </p>
+        </Card>
+      </section>
+
       {/* Set New Reward / Store Management CTA */}
       <Card className="p-8 primary-gradient text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
         <div className="absolute -right-10 -bottom-10 opacity-20 transform rotate-12">
@@ -303,6 +416,52 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
           </Button>
         </div>
       </Card>
+
+      {/* Punishment Confirmation Modal */}
+      <AnimatePresence>
+        {punishModalConfig && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setPunishModalConfig(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-surface w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative z-10 border border-outline/10 text-center space-y-6"
+            >
+              <div className="space-y-4">
+                <div className="flex justify-center text-red-500 mb-2">
+                  <AlertTriangle size={48} />
+                </div>
+                <h3 className="text-2xl font-bold text-on-surface tracking-tight">确认触发处分？</h3>
+                <p className="text-on-surface-variant leading-relaxed text-sm">
+                  你即将对 <strong>{punishModalConfig.target}</strong> 发出<strong className="text-red-500 mx-1">{punishModalConfig.name}</strong>处分，<br />
+                  将立即扣除 <strong className="text-red-500">{punishModalConfig.amount}</strong> 积分。
+                </p>
+                <div className="text-left mt-4 border border-red-500/20 bg-red-50/30 p-4 rounded-xl">
+                  <p className="text-xs font-bold text-red-700 uppercase tracking-widest mb-2 pl-2 flex items-center gap-1">
+                    处分原因 <span className="text-[10px] bg-red-100 text-red-500 px-1 rounded">必填</span>
+                  </p>
+                  <Input
+                    placeholder="例如：未按时完成作业、对长辈没礼貌..."
+                    value={punishReason}
+                    onChange={(e) => setPunishReason(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 pt-4">
+                <Button fullWidth onClick={confirmPenalize} className={cn("border-none text-white", punishReason.trim() ? "bg-red-500 hover:bg-red-600" : "bg-red-300")} disabled={!punishReason.trim()}>
+                  确认扣除 {punishModalConfig.amount} 分
+                </Button>
+                <button onClick={() => setPunishModalConfig(null)} className="w-full py-4 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">
+                  取消操作
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div >
   );
 };

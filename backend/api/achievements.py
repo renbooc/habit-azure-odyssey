@@ -4,10 +4,16 @@ from repository.supabase_client import supabase
 router = APIRouter(prefix="/api/achievements", tags=["achievements"])
 
 @router.get("/child")
-def get_child_achievements():
-    # 获取所有的已完成任务作为数据源来进行联动计算
-    res = supabase.table("tasks").select("*").eq("completed", True).execute()
-    completed_tasks = res.data or []
+def get_child_achievements(family_id: str, username: str = None):
+    query = supabase.table("tasks").select("*").eq("completed", True).eq("family_id", family_id)
+    if username:
+        query = query.eq("username", username)
+    
+    try:
+        res = query.execute()
+        completed_tasks = res.data or []
+    except Exception as e:
+        completed_tasks = []
     
     total_completed = len(completed_tasks)
     
