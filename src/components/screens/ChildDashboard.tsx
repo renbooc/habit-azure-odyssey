@@ -49,6 +49,10 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     // 随机选择背景图
     const randomSeed = HERO_SEEDS[Math.floor(Math.random() * HERO_SEEDS.length)];
     setBgImage(`https://picsum.photos/seed/${randomSeed}/800/450`);
+
+    // 默认展示一句鼓励语
+    const timer = setTimeout(showRandomQuote, 800);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

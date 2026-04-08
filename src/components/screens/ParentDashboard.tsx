@@ -40,6 +40,12 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
   const [selectedChild, setSelectedChild] = useState<string>('');
   const [punishModalConfig, setPunishModalConfig] = useState<{ name: string, amount: number, target: string } | null>(null);
   const [punishReason, setPunishReason] = useState("");
+  const [toastMsg, setToastMsg] = useState<{ title: string, type: 'success' | 'error' } | null>(null);
+
+  const showToast = (title: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg({ title, type });
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const fetchAllData = async () => {
     if (!user) return;
@@ -86,34 +92,12 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
     return () => clearInterval(pollInterval);
   }, [user]);
 
-  const uncompleteTask = async (id: string) => {
-    if (!window.confirm("确定要将此任务标记为未完成吗？")) return;
-    try {
-      const res = await fetch(`${API_URL}/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: false, family_id: user?.family_id })
-      });
-      if (res.ok) {
-        // Optimistically remove from recent tasks
-        setStats(prev => ({
-          ...prev,
-          recent_tasks: prev.recent_tasks.filter(t => t.id !== id),
-          completed_tasks: Math.max(0, prev.completed_tasks - 1)
-        }));
-        // 手动干预后立即触发一遍全体数据刷新（包括排行榜降级）
-        fetchAllData();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handlePenalize = (penaltyName: string, amount: number) => {
     const childrenList = leaderboard.filter(p => p.role === 'child');
     const targetChild = selectedChild || (childrenList.length > 0 ? childrenList[0].username : null);
 
-    if (!targetChild) return alert("没有可惩罚的孩子！");
+    if (!targetChild) return showToast("没有可惩罚的孩子！", "error");
 
     setPunishModalConfig({ name: penaltyName, amount, target: targetChild });
     setPunishReason("");
@@ -133,14 +117,14 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         })
       });
       if (res.ok) {
-        alert("🚨 惩罚已生效，积分已被扣除！");
-        window.location.reload();
+        showToast("🚨 惩罚已生效，积分已被扣除！", "success");
+        fetchAllData();
       } else {
-        alert("操作失败！");
+        showToast("操作失败！", "error");
       }
     } catch (e) {
       console.error(e);
-      alert("网络错误");
+      showToast("网络错误", "error");
     } finally {
       setPunishModalConfig(null);
     }
@@ -286,47 +270,6 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         </Card>
       </section>
 
-      {/* Task List */}
-      <section className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-on-primary-container font-bold text-xl">最近完成的任务</h2>
-          <button onClick={() => onNavigate && onNavigate('tasks')} className="text-primary font-bold text-sm flex items-center gap-1 hover:opacity-80">
-            <BookOpen size={18} />
-            任务管理
-          </button>
-        </div>
-        <div className="space-y-4">
-          {!stats.recent_tasks || stats.recent_tasks.length === 0 ? (
-            <p className="text-center text-on-surface-variant/60 py-4">暂无已完成的任务</p>
-          ) : stats.recent_tasks.map((task: any, i: number) => (
-            <Card key={i} className={`p-6 flex items-center justify-between border-l-4 border-primary`}>
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary`}>
-                  {renderIcon(task.icon)}
-                </div>
-                <div>
-                  <h4 className="font-bold text-on-surface">{task.title}</h4>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-[10px] text-on-surface-variant/60 font-black uppercase tracking-tight">奖励：{task.points} 积分</p>
-                    {task.username && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded font-black flex items-center gap-0.5">
-                        <User size={8} /> {task.username}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div
-                onClick={() => uncompleteTask(task.id)}
-                className={`w-14 h-8 rounded-full p-1 transition-all cursor-pointer bg-primary hover:bg-red-500`}
-                title="撤销完成状态"
-              >
-                <div className={`w-6 h-6 bg-white rounded-full transition-all translate-x-6`} />
-              </div>
-            </Card>
-          ))}
-        </div>
-      </section>
 
       {/* Punishment Panel */}
       <section className="space-y-4">
@@ -460,6 +403,26 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={cn(
+              "fixed top-8 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 font-bold text-sm border",
+              toastMsg.type === 'success'
+                ? "bg-red-50 text-red-600 border-red-200"
+                : "bg-surface-container-high text-on-surface border-surface-variant/30"
+            )}
+          >
+            {toastMsg.type === 'success' && <AlertTriangle size={16} />}
+            {toastMsg.title}
+          </motion.div>
         )}
       </AnimatePresence>
     </div >
