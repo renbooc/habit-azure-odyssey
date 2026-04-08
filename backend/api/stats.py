@@ -85,31 +85,60 @@ def get_child_stats(family_id: str, username: str):
 @router.get("/parent")
 def get_parent_stats(family_id: str):
     """获取指定家庭的家长端聚合数据"""
+    from datetime import datetime, timedelta, timezone
+    tz_plus8 = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz_plus8)
+    
     try:
-        # 1. 家族最近完成的任务 (按完成时间排序)
-        recent_res = supabase.table("tasks")\
-            .select("*")\
-            .eq("completed", True)\
+        tasks_res = supabase.table("tasks")\
+            .select("completed, completed_at")\
             .eq("family_id", family_id)\
-            .order("completed_at", desc=True)\
-            .limit(5)\
             .execute()
+            
+        all_tasks = tasks_res.data or []
+        total_tasks = len(all_tasks)
+        completed_tasks_total = len([t for t in all_tasks if t.get("completed")])
+        rate = int((completed_tasks_total / total_tasks * 100)) if total_tasks > 0 else 0
         
-        # 2. 家族本周任务概况
-        all_tasks = supabase.table("tasks").select("completed").eq("family_id", family_id).execute()
-        total = len(all_tasks.data) if all_tasks.data else 0
-        completed = len([t for t in all_tasks.data if t.get("completed")]) if all_tasks.data else 0
-        rate = int((completed / total * 100)) if total > 0 else 0
+        weekly_map = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0} # 0:周一, 6:周日
         
-        weekly_data = [{"name": "周一", "value": 0}, {"name": "周二", "value": 0}, {"name": "周三", "value": 0}, {"name": "周四", "value": 0}, {"name": "周五", "value": 0}, {"name": "周六", "value": 0}, {"name": "周日", "value": 0}]
+        # 计算本周（自周一起）每天完成的任务数，区分家庭成员
+        today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        monday_of_this_week = today - timedelta(days=today.weekday())
+
+        week_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+        weekly_data = [{"name": name} for name in week_names]
+        active_members = set()
+
+        for t in all_tasks:
+            if t.get("completed") and t.get("completed_at"):
+                uname = t.get("username", "未知")
+                try:
+                    time_str = t["completed_at"]
+                    if time_str.endswith("Z"):
+                        time_str = time_str[:-1] + "+00:00"
+                    
+                    dt_utc = datetime.fromisoformat(time_str)
+                    dt_local = dt_utc.astimezone(tz_plus8)
+                    
+                    # 只统计本周（周一到现在）的数据
+                    if dt_local >= monday_of_this_week:
+                        day_idx = dt_local.weekday()
+                        weekly_data[day_idx][uname] = weekly_data[day_idx].get(uname, 0) + 1
+                        active_members.add(uname)
+                except:
+                    pass
             
         return {
-            "completed_tasks": completed,
+            "completed_tasks": completed_tasks_total,
             "completion_rate": rate,
             "weekly_data": weekly_data,
-            "recent_tasks": recent_res.data or []
+            "active_members": list(active_members),
+            "recent_tasks": []
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
 
 @router.get("/history")

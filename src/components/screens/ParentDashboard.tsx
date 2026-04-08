@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { cn } from '@/src/lib/utils';
 import { AnimatePresence, motion } from 'motion/react';
-import { BarChart, Bar, XAxis, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal, User, AlertTriangle } from 'lucide-react';
 
 const iconMap: Record<string, any> = {
@@ -19,10 +19,11 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
     completed_tasks: 0,
     completion_rate: 0,
     weekly_data: [
-      { name: '周一', value: 0 }, { name: '周二', value: 0 }, { name: '周三', value: 0 },
-      { name: '周四', value: 0 }, { name: '周五', value: 0 }, { name: '周六', value: 0 },
-      { name: '周日', value: 0 },
+      { name: '周一' }, { name: '周二' }, { name: '周三' },
+      { name: '周四' }, { name: '周五' }, { name: '周六' },
+      { name: '周日' },
     ],
+    active_members: [] as string[],
     recent_tasks: [] as any[]
   });
 
@@ -160,11 +161,11 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         <div className="flex justify-between items-end mb-8">
           <div>
             <h2 className="text-on-primary-container font-bold text-xl mb-1">全家进度回顾</h2>
-            <p className="text-on-surface-variant text-sm text-[#FF8C42] font-black">家庭本周活跃度 {stats.completion_rate}%</p>
+            <p className="text-on-surface-variant text-sm text-[#FF8C42] font-black">历史总活跃度 {stats.completion_rate}%</p>
           </div>
           <div className="text-right">
             <span className="text-3xl font-extrabold text-primary">{stats.completed_tasks}</span>
-            <span className="text-on-surface-variant text-sm block">全家已完成</span>
+            <span className="text-on-surface-variant text-sm block">全家历史已完成</span>
           </div>
         </div>
 
@@ -176,15 +177,29 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 10, fontWeight: 600, fill: '#73777b' }}
+                dy={10}
               />
-              <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-                {(stats.weekly_data || []).map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={index === 6 ? '#76C893' : (index % 2 === 0 ? '#FFD1B3' : '#FF8C42')}
-                  />
-                ))}
-              </Bar>
+              <Tooltip
+                cursor={{ fill: 'transparent' }}
+                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+              />
+              {stats.active_members && stats.active_members.length > 0 ? (
+                stats.active_members.map((member: string, index: number) => {
+                  const COLORS = ['#FF8C42', '#76C893', '#6366F1', '#EC4899', '#8B5CF6'];
+                  return (
+                    <Bar
+                      key={member}
+                      dataKey={member}
+                      stackId="a"
+                      fill={COLORS[index % COLORS.length]}
+                      barSize={20}
+                      radius={index === stats.active_members.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                    />
+                  );
+                })
+              ) : (
+                <Bar dataKey="value" fill="#f1f5f9" barSize={20} radius={[4, 4, 0, 0]} />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
