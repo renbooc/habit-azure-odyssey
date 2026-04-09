@@ -8,6 +8,7 @@ import { cn } from '@/src/lib/utils';
 import { AnimatePresence, motion } from 'motion/react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Trophy, Star, PlusCircle, BookOpen, Trash2, Moon, PartyPopper, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed, Crown, Medal, User, AlertTriangle } from 'lucide-react';
+import { TrendCards } from '../stats/TrendCards';
 
 const iconMap: Record<string, any> = {
   BookOpen, Trash2, Moon, Trophy, Star, Rocket, Droplets, Puzzle, TreePine, Lock, Coffee, Utensils, Tv, Gamepad2, Bed
@@ -156,54 +157,11 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
         </Card>
       </section>
 
-      {/* Weekly Progress */}
-      <Card className="p-8">
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h2 className="text-on-primary-container font-bold text-xl mb-1">全家进度回顾</h2>
-            <p className="text-on-surface-variant text-sm text-[#FF8C42] font-black">历史总活跃度 {stats.completion_rate}%</p>
-          </div>
-          <div className="text-right">
-            <span className="text-3xl font-extrabold text-primary">{stats.completed_tasks}</span>
-            <span className="text-on-surface-variant text-sm block">全家历史已完成</span>
-          </div>
-        </div>
-
-        <div className="h-40 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.weekly_data}>
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fontWeight: 600, fill: '#73777b' }}
-                dy={10}
-              />
-              <Tooltip
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
-              />
-              {stats.active_members && stats.active_members.length > 0 ? (
-                stats.active_members.map((member: string, index: number) => {
-                  const COLORS = ['#FF8C42', '#76C893', '#6366F1', '#EC4899', '#8B5CF6'];
-                  return (
-                    <Bar
-                      key={member}
-                      dataKey={member}
-                      stackId="a"
-                      fill={COLORS[index % COLORS.length]}
-                      barSize={20}
-                      radius={index === stats.active_members.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    />
-                  );
-                })
-              ) : (
-                <Bar dataKey="value" fill="#f1f5f9" barSize={20} radius={[4, 4, 0, 0]} />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+      {/* Family Growth Trends (New Integrated Component) */}
+      <TrendCards
+        familyId={user?.family_id || ''}
+        title="全家习惯养成趋势"
+      />
 
       {/* Badge Achievement */}
       <div className="bg-primary p-8 rounded-xl flex flex-col justify-between text-on-primary shadow-lg overflow-hidden relative">

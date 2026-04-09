@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from repository.supabase_client import supabase
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 router = APIRouter()
 
@@ -284,4 +284,77 @@ def get_transactions(family_id: str, username: str):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return {"error": str(e)}
+
+@router.get("/history/weeks")
+def get_stats_weeks(family_id: str, username: Optional[str] = None):
+    """获取过去 4 周的周度聚合统计"""
+    from datetime import datetime, timedelta, timezone
+    tz_plus8 = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz_plus8)
+    
+    try:
+        # 追溯 4 周前 (28天)
+        days_ago_utc = (now_local - timedelta(days=28)).astimezone(timezone.utc)
+        
+        query = supabase.table("tasks").select("completed_at, points").eq("completed", True).eq("family_id", family_id)
+        if username:
+            query = query.eq("username", username)
+        
+        res = query.gte("completed_at", days_ago_utc.isoformat()).execute()
+        raw_data = res.data or []
+        
+        # 按周聚合 (0: 本周, 1: 上周 ...)
+        week_stats = []
+        for i in range(3, -1, -1):
+            start_of_period = now_local - timedelta(days=(i+1)*7)
+            end_of_period = now_local - timedelta(days=i*7)
+            label = "本周" if i == 0 else f"{i}周前"
+            week_stats.append({"name": label, "count": 0, "points": 0})
+            
+            for t in raw_data:
+                dt_utc = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
+                dt_local = dt_utc.astimezone(tz_plus8)
+                if start_of_period <= dt_local < end_of_period:
+                    week_stats[-1]["count"] += 1
+                    week_stats[-1]["points"] += int(t.get("points") or 0)
+        
+        return week_stats
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/history/months")
+def get_stats_months(family_id: str, username: Optional[str] = None):
+    """获取过去 6 个月的月度趋势统计"""
+    from datetime import datetime, timedelta, timezone
+    from dateutil.relativedelta import relativedelta
+    tz_plus8 = timezone(timedelta(hours=8))
+    now_local = datetime.now(tz_plus8)
+    
+    try:
+        # 追溯 6 个月前
+        months_ago_utc = (now_local - relativedelta(months=6)).astimezone(timezone.utc)
+        
+        query = supabase.table("tasks").select("completed_at, points").eq("completed", True).eq("family_id", family_id)
+        if username:
+            query = query.eq("username", username)
+            
+        res = query.gte("completed_at", months_ago_utc.isoformat()).execute()
+        raw_data = res.data or []
+        
+        month_stats = []
+        for i in range(5, -1, -1):
+            target_date = now_local - relativedelta(months=i)
+            month_label = target_date.strftime("%Y-%m")
+            month_stats.append({"name": month_label, "count": 0, "points": 0})
+            
+            for t in raw_data:
+                dt_utc = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
+                dt_local = dt_utc.astimezone(tz_plus8)
+                if dt_local.strftime("%Y-%m") == month_label:
+                    month_stats[-1]["count"] += 1
+                    month_stats[-1]["points"] += int(t.get("points") or 0)
+                    
+        return month_stats
+    except Exception as e:
         return {"error": str(e)}

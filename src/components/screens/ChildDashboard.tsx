@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { useUser } from '@/src/context/UserContext';
+import { TrendCards } from '../stats/TrendCards';
 
 export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string) => void }) => {
   const { user, refreshPoints } = useUser();
@@ -242,63 +243,12 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
         </Card>
       </div>
 
-      {/* Weekly Growth Chart */}
-      <Card className="p-6 overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <TrendingUp size={22} />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-sm text-on-surface">专注力能量周报</h3>
-              <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-tight">每日专注时长 (分钟)</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-2xl font-black text-primary">
-              {Array.isArray(history) ? history.reduce((acc, curr) => acc + (curr.minutes || 0), 0) : 0}
-            </span>
-            <span className="text-[10px] font-black text-on-surface-variant/40 block">本周总分钟</span>
-          </div>
-        </div>
-
-        <div className="h-40 w-full mt-4 -ml-4">
-          <ResponsiveContainer width="105%" height="100%">
-            <BarChart data={Array.isArray(history) ? history : []}>
-              <XAxis
-                dataKey="date"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
-                dy={10}
-              />
-              <Tooltip
-                cursor={{ fill: 'transparent' }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-surface p-2 rounded-lg shadow-xl border border-outline-variant/30 text-[10px] font-bold">
-                        <p className="text-primary">{payload[0].value} 分钟</p>
-                        <p className="text-on-surface-variant/60">{payload[0].payload.count} 个任务</p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Bar dataKey="minutes" radius={[4, 4, 4, 4]} barSize={18}>
-                {history.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.minutes > 0 ? '#6366f1' : '#f1f5f9'}
-                    fillOpacity={index === history.length - 1 ? 1 : 0.6}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+      {/* Enhanced Growth Trends */}
+      <TrendCards
+        familyId={user?.family_id || ''}
+        username={user?.username}
+        title="我的成长轨迹"
+      />
 
       {/* Quick Actions */}
       <section className="space-y-4">
