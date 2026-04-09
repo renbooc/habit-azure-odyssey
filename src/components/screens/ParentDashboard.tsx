@@ -15,7 +15,7 @@ const iconMap: Record<string, any> = {
 };
 
 export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) => void }) => {
-  const { user } = useUser();
+  const { user, refreshPoints } = useUser();
   const [stats, setStats] = useState({
     completed_tasks: 0,
     completion_rate: 0,
@@ -105,6 +105,67 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
     setPunishReason("");
   };
 
+  const [childTransactions, setChildTransactions] = useState<any[]>([]);
+
+  const [revertModalConfig, setRevertModalConfig] = useState<any>(null);
+
+  const fetchChildTransactions = async (childName: string) => {
+    try {
+      const ts = Date.now();
+      const safeName = encodeURIComponent(childName);
+      const res = await fetch(`${API_URL}/stats/transactions?family_id=${user?.family_id}&username=${safeName}&_t=${ts}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChildTransactions(data || []);
+      }
+    } catch (e) {
+      console.error("历史拉取失败", e);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedChild) {
+      fetchChildTransactions(selectedChild);
+    } else {
+      const childrenList = leaderboard.filter(p => p.role === 'child');
+      if (childrenList.length > 0) {
+        setSelectedChild(childrenList[0].username);
+      }
+    }
+  }, [selectedChild, leaderboard.length]);
+
+  const confirmRevert = async () => {
+    if (!revertModalConfig) return;
+    try {
+      const tx = revertModalConfig;
+      const res = await fetch(`${API_URL}/stats/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          family_id: user?.family_id,
+          username: selectedChild,
+          transaction_id: tx.id,
+          source_type: tx.source_type,
+          amount: tx.amount,
+          title: tx.title
+        })
+      });
+      if (res.ok) {
+        showToast("👍 撤销流水记账成功！", "success");
+        fetchAllData();
+        refreshPoints();
+        if (selectedChild) fetchChildTransactions(selectedChild);
+      } else {
+        const err = await res.json();
+        showToast(err.error || "操作失败", "error");
+      }
+    } catch (e) {
+      showToast("网络请求失败", "error");
+    } finally {
+      setRevertModalConfig(null);
+    }
+  };
+
   const confirmPenalize = async () => {
     if (!punishModalConfig) return;
     try {
@@ -121,6 +182,7 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
       if (res.ok) {
         showToast("🚨 惩罚已生效，积分已被扣除！", "success");
         fetchAllData();
+        fetchChildTransactions(punishModalConfig.target);
       } else {
         showToast("操作失败！", "error");
       }
@@ -307,6 +369,51 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
           <p className="text-xs text-red-500/70 font-bold italic text-center">
             ⚠️ 注：处分将立即扣除孩子身上已拥有的积分。罚单会自动记录，但不会削弱历史总阅历。
           </p>
+
+          {/* 流水撤回中心 (仅对已选中的孩子) */}
+          {selectedChild && (
+            <div className="mt-8 pt-6 border-t border-red-500/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-red-900 flex items-center gap-2">
+                  {selectedChild} 的近期明细
+                </h3>
+                <span className="text-xs font-bold text-red-500/60 uppercase">仅展示最近10条</span>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {childTransactions.length === 0 ? (
+                  <p className="text-center py-4 text-xs font-bold text-red-900/40">暂无任何流水记录</p>
+                ) : (
+                  childTransactions.slice(0, 10).map((tx: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-white/50 rounded-xl border border-red-500/10 hover:bg-white transition-colors">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-on-surface">{tx.title}</span>
+                        <span className="text-[10px] font-bold text-on-surface-variant/50">
+                          {new Date(tx.time).toLocaleString('zh-CN')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={cn(
+                          "text-base font-black tabular-nums",
+                          tx.type === 'earn' ? 'text-primary' : 'text-red-500'
+                        )}>
+                          {tx.type === 'earn' ? '+' : ''}{tx.amount}
+                        </span>
+                        {tx.id && (
+                          <button
+                            onClick={() => setRevertModalConfig(tx)}
+                            className="px-3 py-1.5 rounded-lg bg-red-100/50 hover:bg-red-200 text-red-600 border border-red-200 text-xs font-bold transition-all"
+                          >
+                            撤回
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </Card>
       </section>
 
@@ -372,6 +479,46 @@ export const ParentDashboard = ({ onNavigate }: { onNavigate?: (screen: string) 
                 </Button>
                 <button onClick={() => setPunishModalConfig(null)} className="w-full py-4 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">
                   取消操作
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Revert Confirmation Modal */}
+      <AnimatePresence>
+        {revertModalConfig && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setRevertModalConfig(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-surface w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative z-10 border border-outline/10 text-center space-y-6"
+            >
+              <div className="space-y-4">
+                <div className="flex justify-center text-red-500 mb-2">
+                  <AlertTriangle size={48} />
+                </div>
+                <h3 className="text-2xl font-bold text-on-surface tracking-tight">撤回操作确认</h3>
+                <p className="text-on-surface-variant leading-relaxed text-sm">
+                  你即将撤销 <strong>{selectedChild}</strong> 的流水记录：<br />
+                  <strong className="text-primary mx-1">{revertModalConfig.title}</strong>
+                  <br />
+                  <span className="text-xs opacity-70 mt-2 block">
+                    系统将追加一笔反向流水以抵消本次操作。
+                  </span>
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 pt-4">
+                <Button fullWidth onClick={confirmRevert} className="bg-red-500 hover:bg-red-600 text-white border-none">
+                  确认执行撤销
+                </Button>
+                <button onClick={() => setRevertModalConfig(null)} className="w-full py-4 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors">
+                  暂不操作
                 </button>
               </div>
             </motion.div>

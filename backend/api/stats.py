@@ -261,7 +261,7 @@ def get_transactions(family_id: str, username: str):
     try:
         # 获取积分增加记录 (已完成的任务)
         tasks_res = supabase.table("tasks")\
-            .select("title, points, completed_at")\
+            .select("id, title, points, completed_at")\
             .eq("completed", True)\
             .eq("family_id", family_id)\
             .eq("username", username)\
@@ -269,7 +269,7 @@ def get_transactions(family_id: str, username: str):
             
         # 获取积分消耗记录 (商城购买 / 处分)
         purchases_res = supabase.table("store_purchases")\
-            .select("item_id, price, created_at")\
+            .select("id, item_id, price, created_at")\
             .eq("family_id", family_id)\
             .eq("username", username)\
             .execute()
@@ -289,23 +289,30 @@ def get_transactions(family_id: str, username: str):
 
         for t in (tasks_res.data or []):
             if t.get("completed_at"):
+                amt = safe_int(t.get("points"))
                 transactions.append({
+                    "id": t.get("id"),
+                    "source_type": "task",
                     "title": t.get("title", "完成任务"),
-                    "amount": safe_int(t.get("points")),
-                    "type": "earn",
+                    "amount": amt,
+                    "type": "earn" if amt >= 0 else "spend",
                     "time": t.get("completed_at")
                 })
                 
         for p in (purchases_res.data or []):
             if p.get("created_at"):
                 raw_item_id = p.get("item_id", "商城兑换")
-                # 尝试通过 UUID 获取真实商品名称，若找不到（比如罚单直接存的是文本），则兜底使用 raw_item_id
                 display_title = item_dict.get(raw_item_id, raw_item_id)
+                if raw_item_id.startswith("撤回加分") or raw_item_id.startswith("撤回扣分"):
+                    display_title = raw_item_id
                 
+                amt = -safe_int(p.get("price"))
                 transactions.append({
+                    "id": p.get("id"),
+                    "source_type": "purchase",
                     "title": display_title,
-                    "amount": -safe_int(p.get("price")),
-                    "type": "spend",
+                    "amount": amt,
+                    "type": "earn" if amt >= 0 else "spend",
                     "time": p.get("created_at")
                 })
                 
@@ -313,6 +320,48 @@ def get_transactions(family_id: str, username: str):
         transactions.sort(key=lambda x: x["time"], reverse=True)
         
         return transactions
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+from pydantic import BaseModel
+from datetime import datetime, timezone
+
+class RevertRequest(BaseModel):
+    transaction_id: str
+    source_type: str  # "task" or "purchase"
+    family_id: str
+    username: str
+    amount: int  # The historical amount being reverted
+    title: str
+
+@router.post("/revert")
+def revert_transaction(req: RevertRequest):
+    """撤回流水记录: 采用追加反向流水账的方式，避免历史被抹除"""
+    try:
+        if req.source_type == "task":
+            # 撤回任务完成加分：新增一条等值的正向扣解记录(price 为正代表扣分)
+            res = supabase.table("store_purchases").insert({
+                "family_id": req.family_id,
+                "username": req.username,
+                "item_id": f"撤回加分: {req.title}",
+                "price": req.amount,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+        elif req.source_type == "purchase":
+            # 撤销商城购买或处分扣分：新增一条反向退分记录(price 为负代表加回分数)
+            res = supabase.table("store_purchases").insert({
+                "family_id": req.family_id,
+                "username": req.username,
+                "item_id": f"撤销扣分: {req.title}",
+                "price": req.amount, # 原记录如果是 -扣分，那么传递过来的 req.amount 是负数，刚好这里 price 也用负数，相当于负向消费（赚分）
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+        else:
+            raise Exception("未知的流水类型")
+            
+        return {"status": "success", "message": "流水已撤回并入账"}
     except Exception as e:
         import traceback
         traceback.print_exc()
