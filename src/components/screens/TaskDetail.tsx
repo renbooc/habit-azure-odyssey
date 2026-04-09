@@ -84,7 +84,12 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
   useEffect(() => {
     const fetchTask = async () => {
       try {
-        const res = await fetch(`${API_URL}/tasks/${taskId}?family_id=${user?.family_id}&username=${user?.username}`);
+        const safeFamilyId = encodeURIComponent(user?.family_id || '');
+        const safeUsername = encodeURIComponent(user?.username || '');
+        const ts = Date.now();
+        const res = await fetch(`${API_URL}/tasks/${taskId}?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         if (res.ok) {
           const data = await res.json();
           setTask(data);

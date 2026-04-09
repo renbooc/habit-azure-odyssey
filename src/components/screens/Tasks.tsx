@@ -76,7 +76,8 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
       // 传入当前用户的 username 以触发后端生成属于该用户的每日任务
       const queryParams = new URLSearchParams({
         family_id: user?.family_id || '',
-        username: user?.username || ''
+        username: user?.username || '',
+        _t: Date.now().toString()
       });
 
       // 如果是家长视角，请求全家所有人的任务以供预览/管理
@@ -84,7 +85,7 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
         queryParams.append('all_family', 'true');
       }
 
-      const res = await fetch(`${API_BASE}/?${queryParams.toString()}`);
+      const res = await fetch(`${API_BASE}/?${queryParams.toString()}`, { headers: { 'Cache-Control': 'no-cache' } });
       if (res.ok) {
         let fetchedTasks = await res.json();
         // 如果是家长视角，针对全家所有成员分发的多份冗余任务进行去重展示

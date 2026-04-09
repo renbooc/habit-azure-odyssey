@@ -38,7 +38,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!currentUser || !currentUser.family_id) return;
 
             isRefreshing.current = true;
-            const res = await fetch(`${API_URL}/stats/child?family_id=${currentUser.family_id}&username=${currentUser.username}`);
+            // 关键修复：破除移动端（尤其是微信或Safari）对GET请求的激进缓存，并且必须对中文字符做 URL encode 处理
+            const ts = Date.now();
+            const safeFamilyId = encodeURIComponent(currentUser.family_id);
+            const safeUsername = encodeURIComponent(currentUser.username);
+            const res = await fetch(`${API_URL}/stats/child?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, {
+                headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+            });
             if (res.ok) {
                 const data = await res.json();
                 // 只有在获取到数值时才更新，防止 undefined 或 null 导致清零

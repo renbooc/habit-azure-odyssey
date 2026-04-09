@@ -41,7 +41,12 @@ export const Header = ({ title, points = 125, avatarUrl, username, onLogout, onA
     if (!user) return;
     setLoadingHistory(true);
     try {
-      const res = await fetch(`${API_URL}/stats/transactions?family_id=${user.family_id}&username=${user.username}`);
+      const safeFamilyId = encodeURIComponent(user.family_id);
+      const safeUsername = encodeURIComponent(user.username);
+      const ts = Date.now();
+      const res = await fetch(`${API_URL}/stats/transactions?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, {
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+      });
       if (res.ok) {
         setTransactions(await res.json());
       }

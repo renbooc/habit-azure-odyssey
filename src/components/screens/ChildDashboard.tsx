@@ -57,9 +57,12 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
   }, []);
 
   useEffect(() => {
+    const safeFamilyId = encodeURIComponent(user?.family_id || '');
+    const safeUsername = encodeURIComponent(user?.username || '');
+    const ts = Date.now();
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/child?family_id=${user?.family_id}&username=${user?.username}`);
+        const res = await fetch(`${API_URL}/stats/child?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, { headers: { 'Cache-Control': 'no-cache' } });
         if (res.ok) {
           const data = await res.json();
           setStats(data);
@@ -70,7 +73,7 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
     };
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_URL}/stats/history?family_id=${user?.family_id}&username=${user?.username}`);
+        const res = await fetch(`${API_URL}/stats/history?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, { headers: { 'Cache-Control': 'no-cache' } });
         if (res.ok) {
           const data = await res.json();
           // 确保返回的是数组
