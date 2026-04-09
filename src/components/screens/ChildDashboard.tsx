@@ -65,7 +65,11 @@ export const ChildDashboard = ({ onSelectTask }: { onSelectTask: (taskId: string
         const res = await fetch(`${API_URL}/stats/child?family_id=${safeFamilyId}&username=${safeUsername}&_t=${ts}`, { headers: { 'Cache-Control': 'no-cache' } });
         if (res.ok) {
           const data = await res.json();
-          setStats(data);
+          if (data.error) {
+            console.error("Backend Error returned:", data.error, data.traceback);
+          } else {
+            setStats(data);
+          }
         }
       } catch (err) {
         console.error('获取孩子统计数据失败', err);

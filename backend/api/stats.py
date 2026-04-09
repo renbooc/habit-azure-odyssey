@@ -34,17 +34,24 @@ def get_child_stats(family_id: str, username: str):
         tasks_data = tasks_res.data or []
         completed_tasks = [t for t in tasks_data if t.get("completed")]
         
+        def safe_int(val):
+            try:
+                if not val: return 0
+                return int(float(val))
+            except:
+                return 0
+
         # 1. 经验与等级计算
-        base_xp = sum(int(t.get("points") or 10) for t in completed_tasks)
+        base_xp = sum(safe_int(t.get("points")) for t in completed_tasks)
         purchases_res = supabase.table("store_purchases").select("item_id, price").eq("family_id", family_id).eq("username", username).execute()
         purchases = purchases_res.data or []
         
         # 惩罚类直接削弱总阅历(历史经验值)
-        penalty_spent = sum(int(p.get("price") or 0) for p in purchases if str(p.get("item_id", "")).startswith("罚单_"))
+        penalty_spent = sum(safe_int(p.get("price")) for p in purchases if str(p.get("item_id", "")).startswith("罚单_"))
         total_xp = max(0, base_xp - penalty_spent)
         
         # 花费(包含惩罚与正常兑换) 扣除全部积分余额
-        total_spent = sum(int(p.get("price") or 0) for p in purchases)
+        total_spent = sum(safe_int(p.get("price")) for p in purchases)
         points = max(0, base_xp - total_spent)
         
         # 诊断日志
@@ -56,10 +63,19 @@ def get_child_stats(family_id: str, username: str):
         completed_dates = set()
         for t in completed_tasks:
             if t.get("completed_at"):
-                # 转换 UTC 到本地
-                dt_utc = datetime.fromisoformat(t["completed_at"].replace("Z", "+00:00"))
-                dt_local = dt_utc.astimezone(tz_plus8)
-                completed_dates.add(dt_local.date())
+                try:
+                    # 转换 UTC 到本地，兼容可能的不规范日期后缀
+                    time_str = str(t["completed_at"])
+                    if time_str.endswith("Z"):
+                        time_str = time_str[:-1] + "+00:00"
+                    
+                    dt_utc = datetime.fromisoformat(time_str)
+                    dt_local = dt_utc.astimezone(tz_plus8)
+                    completed_dates.add(dt_local.date())
+                except Exception as e:
+                    # 容忍单条任务的异形时间数据，不中断全局运算
+                    import traceback
+                    traceback.print_exc()
         
         streak = 0
         check_date = now_local.date()
@@ -85,8 +101,11 @@ def get_child_stats(family_id: str, username: str):
         }
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        return {"error": str(e)}
+        trace_str = traceback.format_exc()
+        print(trace_str)
+        with open("error_log.txt", "a", encoding="utf-8") as f:
+            f.write(f"Error in child stats: {str(e)}\n{trace_str}\n")
+        return {"error": str(e), "traceback": trace_str}
 
 @router.get("/parent")
 def get_parent_stats(family_id: str):
@@ -261,11 +280,18 @@ def get_transactions(family_id: str, username: str):
             
         transactions = []
         
+        def safe_int(val):
+            try:
+                if not val: return 0
+                return int(float(val))
+            except:
+                return 0
+
         for t in (tasks_res.data or []):
             if t.get("completed_at"):
                 transactions.append({
                     "title": t.get("title", "完成任务"),
-                    "amount": int(t.get("points") or 0),
+                    "amount": safe_int(t.get("points")),
                     "type": "earn",
                     "time": t.get("completed_at")
                 })
@@ -278,7 +304,7 @@ def get_transactions(family_id: str, username: str):
                 
                 transactions.append({
                     "title": display_title,
-                    "amount": -int(p.get("price") or 0),
+                    "amount": -safe_int(p.get("price")),
                     "type": "spend",
                     "time": p.get("created_at")
                 })
