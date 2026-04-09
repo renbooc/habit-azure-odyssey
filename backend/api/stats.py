@@ -26,6 +26,9 @@ def get_child_stats(family_id: str, username: str):
     tz_plus8 = timezone(timedelta(hours=8))
     now_local = datetime.now(tz_plus8)
     
+    # 鲁棒性：去除用户名可能存在的首尾空格
+    username = username.strip()
+    
     try:
         tasks_res = supabase.table("tasks").select("*").eq("family_id", family_id).eq("username", username).execute()
         tasks_data = tasks_res.data or []
@@ -43,6 +46,9 @@ def get_child_stats(family_id: str, username: str):
         # 花费(包含惩罚与正常兑换) 扣除全部积分余额
         total_spent = sum(int(p.get("price") or 0) for p in purchases)
         points = max(0, base_xp - total_spent)
+        
+        # 诊断日志
+        # print(f"DEBUG [stats/child]: user={username}, base_xp={base_xp}, spent={total_spent}, final={points}")
         
         lvl_info = get_level_data(total_xp)
         
@@ -74,7 +80,7 @@ def get_child_stats(family_id: str, username: str):
             "points": points,
             "streak_days": streak, 
             "plants_count": len(completed_tasks),
-            "water_drops": points,
+            "water_drops": total_xp, # 修正：水滴代表累计阅历，不应随消费减少
             "quick_tasks": uncompleted[:2]
         }
     except Exception as e:

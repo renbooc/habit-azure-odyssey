@@ -30,7 +30,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const refreshPoints = useCallback(async () => {
         if (isRefreshing.current) return;
 
-        // 关键逻辑：直接读取持久化数据，保证 refreshPoints 函数引用的绝对稳定性
         const saved = localStorage.getItem('currentUser');
         if (!saved) return;
 
@@ -42,15 +41,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const res = await fetch(`${API_URL}/stats/child?family_id=${currentUser.family_id}&username=${currentUser.username}`);
             if (res.ok) {
                 const data = await res.json();
-                setPoints(data.points || 0);
+                // 只有在获取到数值时才更新，防止 undefined 或 null 导致清零
+                if (typeof data.points === 'number' || typeof data.water_drops === 'number') {
+                    setPoints(data.points ?? data.water_drops ?? 0);
+                }
+            } else {
+                console.warn('Refresh points failed:', res.status);
             }
         } catch (err) {
             console.error('Failed to refresh points:', err);
         } finally {
-            // 给网络连接和状态更新留出充足的冷静期
             setTimeout(() => { isRefreshing.current = false; }, 1000);
         }
-    }, []); // 依赖设为空，函数引用永不改变
+    }, []);
 
     const login = (userData: any) => {
         setUser(userData);
@@ -91,12 +94,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const parsed = JSON.parse(saved);
                 setUser(parsed);
                 setRole(parsed.role);
+                // 首次快速尝试
                 refreshPoints();
+
+                // 保底重试：移动端环境复杂，3秒后再做一次覆盖刷新，确保最终数据正确
+                const timer = setTimeout(() => {
+                    refreshPoints();
+                }, 3000);
+                return () => clearTimeout(timer);
             } catch (e) {
                 console.error('Failed to parse saved user', e);
             }
         }
-    }, []); // 仅在挂载时执行一次初始化
+    }, [refreshPoints]);
 
     return (
         <UserContext.Provider value={{ user, role, points, login, logout, refreshPoints, updateAvatar }}>

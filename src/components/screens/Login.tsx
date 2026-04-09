@@ -28,17 +28,16 @@ export const Login = ({ onLogin, onNavigateToRegister }: LoginProps) => {
 
     setLoading(true);
     try {
+      // 关键修复：统一转为小写，解决手机浏览器自动首字母大写导致的查询失败
+      const normalizedUsername = username.trim().toLowerCase();
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role })
+        body: JSON.stringify({ username: normalizedUsername, password, role })
       });
 
       if (res.ok) {
         const data = await res.json();
-        // 如果后端下发了 token，则可以在这里存储到 localStorage
-        // localStorage.setItem('token', data.token);
-        // localStorage.setItem('role', data.role);
         onLogin(data);
       } else {
         const errData = await res.json();
