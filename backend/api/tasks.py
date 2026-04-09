@@ -49,18 +49,20 @@ def delete_task_template(template_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[TaskResponse])
-def get_all_tasks(family_id: str, username: Optional[str] = None):
-    """获取指定家庭的任务列表（如果是孩子，则支持当日挑战自动生成）"""
+def get_all_tasks(family_id: str, username: Optional[str] = None, all_family: bool = False):
+    """获取指定家庭的任务列表（支持当日挑战自动生成）"""
     try:
-        # 1. 只有当明确指定了 username (孩子端拉取) 时，才触发当日挑战的生成
+        # 1. 如果明确指定了 username，则触发该用户的当日挑战生成
+        # 不论是孩子还是家长，进入大厅都应该有自己的任务副本
         if username:
             import datetime
+            # 使用 UTC 零点作为判重的日期基准 (与 supabase 存储一致)
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             # 获取需要生成的每日挑战模板
             dailies = supabase.table("task_templates").select("*").eq("is_daily", True).execute()
             
             if dailies.data:
-                # 检查该特定孩子今天是否已经领过这些任务
+                # 检查该特定用户今天是否已经领过这些任务
                 existing_today = supabase.table("tasks")\
                     .select("template_id")\
                     .eq("family_id", family_id)\
@@ -76,7 +78,7 @@ def get_all_tasks(family_id: str, username: Optional[str] = None):
                     if tmpl["id"] not in existing_ids:
                         to_insert.append({
                             "family_id": family_id,
-                            "username": username, # 绑定到具体孩子
+                            "username": username, # 绑定到当前用户
                             "title": tmpl["title"],
                             "points": tmpl["points"],
                             "icon": tmpl["icon"],
@@ -88,8 +90,10 @@ def get_all_tasks(family_id: str, username: Optional[str] = None):
                 if to_insert:
                     supabase.table("tasks").insert(to_insert).execute()
                 
-        # 2. 调用服务层：如果传了 username 则只返回该孩子的；没传则返回全家人的（家长视图）
-        return TaskService.get_tasks(family_id, username)
+        # 2. 调用服务层：如果 all_family 为 True (通常是家长视图)，则忽略 username 过滤，返回全家任务
+        # 否则 (孩子视图)，如果传了 username 则只返回该用户的
+        filter_username = None if all_family else username
+        return TaskService.get_tasks(family_id, filter_username)
     except Exception as e:
         import traceback
         traceback.print_exc()

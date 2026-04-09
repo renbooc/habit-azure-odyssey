@@ -73,22 +73,30 @@ export const Tasks = ({ role = 'parent', onSelectTask }: { role?: string, onSele
 
   const fetchTasks = async () => {
     try {
-      // 如果是家长视角，不再传递 username，以拉取全家今日任务
+      // 传入当前用户的 username 以触发后端生成属于该用户的每日任务
       const queryParams = new URLSearchParams({
-        family_id: user?.family_id || ''
+        family_id: user?.family_id || '',
+        username: user?.username || ''
       });
-      if (role === 'child' && user?.username) {
-        queryParams.append('username', user.username);
+
+      // 如果是家长视角，请求全家所有人的任务以供预览/管理
+      if (role === 'parent') {
+        queryParams.append('all_family', 'true');
       }
 
       const res = await fetch(`${API_BASE}/?${queryParams.toString()}`);
       if (res.ok) {
         let fetchedTasks = await res.json();
-        // 如果是家长视角，针对全家所有成员分发的多份冗余任务进行名字上的去重展示
+        // 如果是家长视角，针对全家所有成员分发的多份冗余任务进行去重展示
         if (role === 'parent') {
           const uniqueTitleMap = new Map();
           fetchedTasks.forEach((t: any) => {
-            if (!uniqueTitleMap.has(t.title)) uniqueTitleMap.set(t.title, t);
+            const existing = uniqueTitleMap.get(t.title);
+            // 策略优先：如果这个任务记录归属于当前操作的家长本人，则它是最高优先级的“主记录”
+            // 这样当家长点击完成或启动计时器时，操作的是家长自己的 Task ID，积分才会记在家长名下
+            if (!existing || t.username === user?.username) {
+              uniqueTitleMap.set(t.title, t);
+            }
           });
           fetchedTasks = Array.from(uniqueTitleMap.values());
         }

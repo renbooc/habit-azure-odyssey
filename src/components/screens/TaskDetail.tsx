@@ -20,13 +20,13 @@ const icons = {
 } as const;
 
 export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
-  const { user } = useUser();
+  const { user, refreshPoints } = useUser();
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
 
   // Timer states
-  const INITIAL_TIME = 120; // 2 minutes default
+  const INITIAL_TIME = (task?.target_duration || 2) * 60;
   const [timeLeft, setTimeLeft] = useState(INITIAL_TIME);
   const [isActive, setIsActive] = useState(false);
 
@@ -44,6 +44,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
         })
       });
       if (res.ok) {
+        refreshPoints();
         onBack();
       }
     } catch (err) {
@@ -51,7 +52,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
     } finally {
       setCompleting(false);
     }
-  }, [task, completing, taskId, onBack]);
+  }, [task, completing, taskId, onBack, user, refreshPoints]);
 
   useEffect(() => {
     let interval: any = null;
@@ -80,10 +81,6 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // SVG circle math
-  const strokeDasharray = 552.92; // 2 * pi * r (where r = 88)
-  const strokeDashoffset = strokeDasharray - (timeLeft / INITIAL_TIME) * strokeDasharray;
-
   useEffect(() => {
     const fetchTask = async () => {
       try {
@@ -91,6 +88,8 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
         if (res.ok) {
           const data = await res.json();
           setTask(data);
+          // 修正：拉取任务后，根据任务实际配置时长更新倒计时
+          setTimeLeft((data.target_duration || 2) * 60);
         }
       } catch (err) {
         console.error('Failed to fetch task detail', err);
@@ -99,7 +98,7 @@ export const TaskDetail = ({ taskId, onBack }: TaskDetailProps) => {
       }
     };
     fetchTask();
-  }, [taskId]);
+  }, [taskId, user]);
 
 
 
