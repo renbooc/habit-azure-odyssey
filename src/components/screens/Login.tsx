@@ -28,8 +28,8 @@ export const Login = ({ onLogin, onNavigateToRegister }: LoginProps) => {
 
     setLoading(true);
     try {
-      // 关键修复：统一转为小写，解决手机浏览器自动首字母大写导致的查询失败
-      const normalizedUsername = username.trim().toLowerCase();
+      // 通过 trim 过滤无意空格。大写问题交由后端的 ilike 解决，保留原有大写避免旧账户登录失败
+      const normalizedUsername = username.trim();
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

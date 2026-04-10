@@ -15,7 +15,7 @@ class AuthService:
         hashed_password = AuthService._hash_password(data.password)
         try:
             # 1. 首先检查用户名冲突 (全局唯一用户名)
-            existing_user = supabase.table("users").select("*").eq("username", data.username).execute()
+            existing_user = supabase.table("users").select("*").ilike("username", data.username).execute()
             if existing_user.data and len(existing_user.data) > 0:
                 raise Exception("注册失败：该用户名已被占用")
 
@@ -54,7 +54,7 @@ class AuthService:
         """登录校验：带回所属家庭 ID"""
         hashed_password = AuthService._hash_password(data.password)
         try:
-            res = supabase.table("users").select("*").eq("username", data.username).eq("role", data.role).execute()
+            res = supabase.table("users").select("*").ilike("username", data.username).eq("role", data.role).execute()
             if res.data and len(res.data) > 0:
                 user = res.data[0]
                 if user.get("password") == hashed_password:
