@@ -1,25 +1,27 @@
 import os
+
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
 # 打印环境变量加载情况 (不打印完整 Key，只检查存不存在)
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_KEY")
-# print(f"DEBUG: SUPABASE_URL is {'SET' if supabase_url else 'MISSING'}")
-# print(f"DEBUG: SUPABASE_KEY is {'SET' if supabase_key else 'MISSING'}")
 
-from api import auth, tasks, store, stats
+from api import achievements, auth, stats, store, tasks, trust, users
 
-app = FastAPI(title="Azure Odyssey API", description="家庭任务管理与积分系统 API", version="1.0.0")
+app = FastAPI(
+    title="Azure Odyssey API", description="家庭任务管理与积分系统 API", version="1.0.0"
+)
 
 # 配置 CORS，允许前端进行跨域访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 线上环境应该指定具体的前端地址
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,15 +29,12 @@ app.add_middleware(
 
 # 注册 API 路由
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
+app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["任务管理"])
 app.include_router(store.router, prefix="/api/store", tags=["积分商城"])
 app.include_router(stats.router, prefix="/api/stats", tags=["统计数据"])
-from api import users, achievements
-app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(achievements.router, tags=["成就徽章"])
-
-from fastapi.staticfiles import StaticFiles
-import os
+app.include_router(trust.router, prefix="/api/trust", tags=["信任指数"])
 
 # 如果 dist 目录存在（生产环境下），则挂载静态文件服务
 if os.path.exists("../dist"):

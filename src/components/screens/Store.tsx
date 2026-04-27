@@ -1,16 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useUser } from '@/src/context/UserContext';
-import { API_URL } from '@/src/api_config';
-import { Card } from '@/src/components/ui/Card';
-import { ShoppingBag, Lightbulb, Gamepad2, BookOpen, Tv, Stars, Gift, Plus, Trash2, Wallet } from 'lucide-react';
-import { Modal } from '../ui/Modal';
-import { Input } from '@/src/components/ui/Input';
-import { cn } from '@/src/lib/utils';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { useUser } from "@/src/context/UserContext";
+import { API_URL } from "@/src/api_config";
+import { Card } from "@/src/components/ui/Card";
+import {
+  ShoppingBag,
+  Lightbulb,
+  Gamepad2,
+  BookOpen,
+  Tv,
+  Stars,
+  Gift,
+  Plus,
+  Trash2,
+  Wallet,
+  Shield,
+  AlertTriangle,
+} from "lucide-react";
+import { Modal } from "../ui/Modal";
+import { Input } from "@/src/components/ui/Input";
+import { cn } from "@/src/lib/utils";
+import { useTrust } from "@/src/context/TrustContext";
+import { TrustLevelBadge } from "@/src/components/trust/TrustLevelBadge";
+import { TrustHistoryModal } from "@/src/components/trust/TrustHistoryModal";
 
 // Icon 映射表
 const iconMap: Record<string, any> = {
-  Gamepad2, BookOpen, Tv, Stars, ShoppingBag
+  Gamepad2,
+  BookOpen,
+  Tv,
+  Stars,
+  ShoppingBag,
 };
 
 interface StoreItem {
@@ -29,29 +49,48 @@ interface StoreProps {
   onPurchase?: () => void;
 }
 
-export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps) => {
+export const Store = ({
+  userPoints = 0,
+  role = "child",
+  onPurchase,
+}: StoreProps) => {
   const { user } = useUser();
+  const { trustStatus } = useTrust();
   const [items, setItems] = useState<StoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
-  const [confirmConfig, setConfirmConfig] = useState<{ title: string, message: string, onConfirm: () => void, type?: 'info' | 'danger' } | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: "info" | "danger";
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>('全部');
+  const [activeCategory, setActiveCategory] = useState<string>("全部");
   const [isAdding, setIsAdding] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
+  const [newItemName, setNewItemName] = useState("");
   const [newItemPrice, setNewItemPrice] = useState(100);
-  const [newItemIcon, setNewItemIcon] = useState('Gamepad2');
+  const [newItemIcon, setNewItemIcon] = useState("Gamepad2");
+  const [showTrustModal, setShowTrustModal] = useState(false);
 
-  const CATEGORIES = ['全部', '玩具', '零食', '书籍', '虚拟奖励'];
+  const CATEGORIES = ["全部", "玩具", "零食", "书籍", "虚拟奖励"];
 
   const getItemCategory = (item: StoreItem): string => {
-    const name = item.name || '';
-    const icon = item.icon || '';
-    if (name.includes('玩具') || icon === 'Gamepad2') return '玩具';
-    if (name.includes('零食') || name.includes('吃') || name.includes('糖')) return '零食';
-    if (name.includes('书') || icon === 'BookOpen') return '书籍';
-    if (icon === 'Tv' || icon === 'Stars' || name.includes('分钟') || name.includes('动画') || name.includes('游乐园')) return '虚拟奖励';
-    return '其他'; // Fallback
+    const name = item.name || "";
+    const icon = item.icon || "";
+    if (name.includes("玩具") || icon === "Gamepad2") return "玩具";
+    if (name.includes("零食") || name.includes("吃") || name.includes("糖"))
+      return "零食";
+    if (name.includes("书") || icon === "BookOpen") return "书籍";
+    if (
+      icon === "Tv" ||
+      icon === "Stars" ||
+      name.includes("分钟") ||
+      name.includes("动画") ||
+      name.includes("游乐园")
+    )
+      return "虚拟奖励";
+    return "其他"; // Fallback
   };
 
   const showToast = (msg: string) => {
@@ -60,18 +99,20 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/store/items?family_id=${user?.family_id}`);
+      const res = await fetch(
+        `${API_URL}/store/items?family_id=${user?.family_id}`,
+      );
       if (res.ok) {
         const data = await res.json();
         const enhancedData = data.map((item: any) => ({
           ...item,
-          sub: item.sub || '通过努力获得的奖励，快来兑换吧！',
+          sub: item.sub || "通过努力获得的奖励，快来兑换吧！",
           img: item.img || null,
         }));
         setItems(enhancedData);
       }
     } catch (error) {
-      console.error('获取商品失败:', error);
+      console.error("获取商品失败:", error);
     } finally {
       setLoading(false);
     }
@@ -85,33 +126,44 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
     if (!newItemName || newItemPrice <= 0) return;
     try {
       const res = await fetch(`${API_URL}/store/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newItemName, price: newItemPrice, icon: newItemIcon })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newItemName,
+          price: newItemPrice,
+          icon: newItemIcon,
+        }),
       });
       if (res.ok) {
         setIsAdding(false);
-        setNewItemName('');
+        setNewItemName("");
         fetchItems();
-        showToast('✅ 商品添加成功');
+        showToast("✅ 商品添加成功");
       }
     } catch (e) {
       console.error(e);
-      showToast('❌ 添加失败');
+      showToast("❌ 添加失败");
     }
   };
 
   const handleDeleteItem = (id: string) => {
     setConfirmConfig({
-      title: '下架商品？',
-      message: '确定要从商城中移除这个奖励吗？已经兑换的孩子不会受到影响。',
-      type: 'danger',
+      title: "下架商品？",
+      message: "确定要从商城中移除这个奖励吗？已经兑换的孩子不会受到影响。",
+      type: "danger",
       onConfirm: async () => {
         try {
-          const res = await fetch(`${API_URL}/store/items/${id}`, { method: 'DELETE' });
-          if (res.ok) { fetchItems(); showToast('🗑️ 已删除商品'); }
-        } catch (e) { console.error(e); }
-      }
+          const res = await fetch(`${API_URL}/store/items/${id}`, {
+            method: "DELETE",
+          });
+          if (res.ok) {
+            fetchItems();
+            showToast("🗑️ 已删除商品");
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      },
     });
   };
 
@@ -127,15 +179,17 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
         <div className="relative z-10 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-black mb-1">
-              {role === 'parent' ? '商城管理' : '积分商城'}
+              {role === "parent" ? "商城管理" : "积分商城"}
             </h2>
             <p className="text-on-primary/90">
-              {role === 'parent' ? '设置丰厚的奖品来激励孩子们吧！' : '赚取更多积分，兑换超赞奖励！'}
+              {role === "parent"
+                ? "设置丰厚的奖品来激励孩子们吧！"
+                : "赚取更多积分，兑换超赞奖励！"}
             </p>
           </div>
           <div className="flex flex-col items-end">
             <span className="text-xs uppercase tracking-wider font-bold opacity-70">
-              {role === 'parent' ? '孩子当前积分' : '当前拥有'}
+              {role === "parent" ? "孩子当前积分" : "当前拥有"}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-4xl font-black italic">{userPoints}</span>
@@ -155,8 +209,10 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
             key={i}
             onClick={() => setActiveCategory(cat)}
             className={cn(
-              'px-6 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all',
-              activeCategory === cat ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-surface-container-high text-on-surface-variant/60 hover:bg-surface-variant'
+              "px-6 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all",
+              activeCategory === cat
+                ? "bg-primary text-white shadow-md shadow-primary/20"
+                : "bg-surface-container-high text-on-surface-variant/60 hover:bg-surface-variant",
             )}
           >
             {cat}
@@ -167,7 +223,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
       {/* Reward Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         {/* Parent Add Item Card */}
-        {role === 'parent' && (
+        {role === "parent" && (
           <Card
             onClick={() => setIsAdding(true)}
             className="p-0 overflow-hidden flex flex-col group transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer border-3 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 h-full min-h-[16rem] items-center justify-center"
@@ -176,109 +232,204 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
               <Plus size={40} />
             </div>
             <h3 className="font-black text-xl text-primary mb-1">上架新商品</h3>
-            <p className="text-sm text-primary/70 font-bold px-4 text-center">配置最具吸引力的全家奖励！</p>
+            <p className="text-sm text-primary/70 font-bold px-4 text-center">
+              配置最具吸引力的全家奖励！
+            </p>
           </Card>
         )}
 
         {loading ? (
-          <p className="text-center text-on-surface-variant/60 py-10 col-span-1 sm:col-span-2 font-bold">仓库备货中...</p>
-        ) : items.filter(item => activeCategory === '全部' || getItemCategory(item) === activeCategory).length === 0 ? (
-          role !== 'parent' && <p className="text-center text-on-surface-variant/60 py-10 col-span-1 sm:col-span-2 font-bold">这一层的货柜空空的喔！</p>
-        ) : items.filter(item => activeCategory === '全部' || getItemCategory(item) === activeCategory).map((item, i) => (
-          <Card key={item.id || i} className="p-0 overflow-hidden flex flex-col group transition-all hover:-translate-y-1 hover:shadow-xl">
-            <div className={cn('relative h-48 w-full bg-surface-container-low flex items-center justify-center', 'bg-gradient-to-br from-indigo-500 to-purple-600')}>
-              {item.img ? (
-                <img src={item.img} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                renderIcon(item.icon)
-              )}
-              {item.comingSoon && (
-                <div className="absolute inset-0 bg-black/10 flex items-center justify-center backdrop-blur-sm">
-                  <span className="bg-black/60 text-white px-4 py-2 rounded-full font-bold text-sm tracking-widest">敬请期待</span>
-                </div>
-              )}
-              <div className="absolute top-3 right-3 flex items-center gap-2">
-                <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-primary font-bold shadow-sm">
-                  {item.price} 积分
-                </span>
-                {role === 'parent' && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }}
-                    className="bg-red-500/90 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="p-5 flex flex-col flex-grow space-y-2">
-              <h3 className="text-xl font-bold text-on-surface">{item.name}</h3>
-              <p className="text-sm text-on-surface-variant/60 flex-grow">{item.sub}</p>
-
-              {role === 'parent' ? (
-                <button
-                  disabled
-                  className="w-full py-3 px-4 rounded-full font-bold transition-all bg-surface-container-low text-on-surface-variant/60"
-                >
-                  <Stars size={16} className="inline mr-2" />
-                  家长预览视角
-                </button>
-              ) : (
-                <button
-                  disabled={item.comingSoon || userPoints < item.price || purchasingId === item.id}
-                  onClick={() => {
-                    if (userPoints < item.price) return;
-                    setConfirmConfig({
-                      title: '确认兑换吗？',
-                      message: `你将消耗 ${item.price} 积分兑换 [${item.name}]。确认后点数将立即扣除哦！`,
-                      type: 'info',
-                      onConfirm: async () => {
-                        setPurchasingId(item.id);
-                        try {
-                          const res = await fetch(`${API_URL}/store/purchase`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              item_id: item.id,
-                              price: item.price,
-                              family_id: user?.family_id,
-                              username: user?.username
-                            })
-                          });
-                          if (res.ok) {
-                            showToast('🎉 兑换成功！');
-                            if (onPurchase) onPurchase();
-                          } else {
-                            showToast('❌ 兑换失败，请稍后重试');
-                          }
-                        } catch (e) {
-                          console.error(e);
-                          showToast('❌ 网络错误');
-                        } finally {
-                          setPurchasingId(null);
-                        }
-                      }
-                    });
-                  }}
+          <p className="text-center text-on-surface-variant/60 py-10 col-span-1 sm:col-span-2 font-bold">
+            仓库备货中...
+          </p>
+        ) : items.filter(
+            (item) =>
+              activeCategory === "全部" ||
+              getItemCategory(item) === activeCategory,
+          ).length === 0 ? (
+          role !== "parent" && (
+            <p className="text-center text-on-surface-variant/60 py-10 col-span-1 sm:col-span-2 font-bold">
+              这一层的货柜空空的喔！
+            </p>
+          )
+        ) : (
+          items
+            .filter(
+              (item) =>
+                activeCategory === "全部" ||
+                getItemCategory(item) === activeCategory,
+            )
+            .map((item, i) => (
+              <Card
+                key={item.id || i}
+                className="p-0 overflow-hidden flex flex-col group transition-all hover:-translate-y-1 hover:shadow-xl"
+              >
+                <div
                   className={cn(
-                    'w-full py-3 px-4 rounded-full font-bold transition-all relative',
-                    item.comingSoon ? 'bg-surface-container-low text-on-surface-variant/40' : (userPoints >= item.price ? 'bg-primary text-white hover:opacity-90 shadow-md' : 'bg-surface-container-low text-on-surface-variant/60 opacity-70 cursor-not-allowed')
+                    "relative h-48 w-full bg-surface-container-low flex items-center justify-center",
+                    "bg-gradient-to-br from-indigo-500 to-purple-600",
                   )}
                 >
-                  <div className={cn("flex items-center justify-center gap-2", purchasingId === item.id ? "opacity-0" : "opacity-100")}>
-                    {item.comingSoon ? '尚未开启' : (userPoints >= item.price ? '立即兑换' : '积分不足')}
-                  </div>
-                  {purchasingId === item.id && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  {item.img ? (
+                    <img
+                      src={item.img}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    renderIcon(item.icon)
+                  )}
+                  {item.comingSoon && (
+                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center backdrop-blur-sm">
+                      <span className="bg-black/60 text-white px-4 py-2 rounded-full font-bold text-sm tracking-widest">
+                        敬请期待
+                      </span>
                     </div>
                   )}
-                </button>
-              )}
-            </div>
-          </Card>
-        ))}
+                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                    <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-primary font-bold shadow-sm">
+                      {item.price} 积分
+                    </span>
+                    {role === "parent" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteItem(item.id);
+                        }}
+                        className="bg-red-500/90 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="p-5 flex flex-col flex-grow space-y-2">
+                  <h3 className="text-xl font-bold text-on-surface">
+                    {item.name}
+                  </h3>
+                  <p className="text-sm text-on-surface-variant/60 flex-grow">
+                    {item.sub}
+                  </p>
+
+                  {role === "parent" ? (
+                    <button
+                      disabled
+                      className="w-full py-3 px-4 rounded-full font-bold transition-all bg-surface-container-low text-on-surface-variant/60"
+                    >
+                      <Stars size={16} className="inline mr-2" />
+                      家长预览视角
+                    </button>
+                  ) : (
+                    <button
+                      disabled={
+                        item.comingSoon ||
+                        userPoints < item.price ||
+                        purchasingId === item.id
+                      }
+                      onClick={() => {
+                        if (userPoints < item.price) return;
+                        setConfirmConfig({
+                          title: "确认兑换吗？",
+                          message: `你将消耗 ${item.price} 积分兑换 [${item.name}]。确认后点数将立即扣除哦！`,
+                          type: "info",
+                          onConfirm: async () => {
+                            setPurchasingId(item.id);
+                            try {
+                              const res = await fetch(
+                                `${API_URL}/store/purchase`,
+                                {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    item_id: item.id,
+                                    price: item.price,
+                                    family_id: user?.family_id,
+                                    username: user?.username,
+                                  }),
+                                },
+                              );
+                              if (res.ok) {
+                                showToast("🎉 兑换成功！");
+                                if (onPurchase) onPurchase();
+                              } else {
+                                showToast("❌ 兑换失败，请稍后重试");
+                              }
+                            } catch (e) {
+                              console.error(e);
+                              showToast("❌ 网络错误");
+                            } finally {
+                              setPurchasingId(null);
+                            }
+                          },
+                        });
+                      }}
+                      className={cn(
+                        "w-full py-3 px-4 rounded-full font-bold transition-all relative",
+                        item.comingSoon
+                          ? "bg-surface-container-low text-on-surface-variant/40"
+                          : userPoints >= item.price
+                            ? "bg-primary text-white hover:opacity-90 shadow-md"
+                            : "bg-surface-container-low text-on-surface-variant/60 opacity-70 cursor-not-allowed",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center justify-center gap-2",
+                          purchasingId === item.id
+                            ? "opacity-0"
+                            : "opacity-100",
+                        )}
+                      >
+                        {item.comingSoon
+                          ? "尚未开启"
+                          : userPoints >= item.price
+                            ? "立即兑换"
+                            : "积分不足"}
+                      </div>
+                      {purchasingId === item.id && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </Card>
+            ))
+        )}
       </div>
+
+      {/* Trust info banner - low trust warning for child */}
+      {role === "child" && trustStatus && trustStatus.trust_score < 41 && (
+        <section className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={16} className="text-red-500" />
+            <h4 className="font-bold text-red-600 text-sm">信任指数较低</h4>
+          </div>
+          <p className="text-xs text-red-600/80 leading-relaxed">
+            当前信任指数 {trustStatus.trust_score} 分（
+            {trustStatus.trust_level_title}），
+            兑换需要家长审批。坚持按时完成任务可以提高信任分哦！
+          </p>
+        </section>
+      )}
+
+      {/* Trust info banner - high trust bonus for child */}
+      {role === "child" && trustStatus && trustStatus.multiplier > 1 && (
+        <section className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield size={16} className="text-green-500" />
+            <h4 className="font-bold text-green-600 text-sm">信任加成激活</h4>
+          </div>
+          <p className="text-xs text-green-600/80 leading-relaxed">
+            由于你的高信任指数（{trustStatus.trust_level_title}）， 积分获得倍率
+            ×{trustStatus.multiplier}，兑换无需审批！
+          </p>
+        </section>
+      )}
 
       {/* Tips */}
       <section className="p-4 rounded-lg bg-surface-container-low border-l-4 border-primary">
@@ -286,8 +437,16 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
           <Lightbulb size={20} className="text-primary" />
           如何获得更多积分？
         </h4>
-        <p className="text-sm text-on-surface-variant/60">完成每日健康习惯、阅读故事或帮爸爸妈妈分担家务都可以获得积分哦！</p>
+        <p className="text-sm text-on-surface-variant/60">
+          完成每日健康习惯、阅读故事或帮爸爸妈妈分担家务都可以获得积分哦！
+        </p>
       </section>
+
+      {/* Trust History Modal */}
+      <TrustHistoryModal
+        isOpen={showTrustModal}
+        onClose={() => setShowTrustModal(false)}
+      />
 
       {/* Central Celebration Modal */}
       <AnimatePresence>
@@ -327,7 +486,7 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
       {/* Adding Modal for Parent */}
       <AnimatePresence>
-        {isAdding && role === 'parent' && (
+        {isAdding && role === "parent" && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -336,8 +495,12 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
               className="w-full max-w-md bg-surface rounded-3xl p-8 shadow-2xl relative z-10 space-y-8"
             >
               <div className="text-center">
-                <h3 className="text-2xl font-black text-on-surface">添加新奖励商品</h3>
-                <p className="text-on-surface-variant/60">为孩子配置一个极具吸引力的奖品吧！</p>
+                <h3 className="text-2xl font-black text-on-surface">
+                  添加新奖励商品
+                </h3>
+                <p className="text-on-surface-variant/60">
+                  为孩子配置一个极具吸引力的奖品吧！
+                </p>
               </div>
 
               <div className="space-y-6">
@@ -349,18 +512,24 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
 
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest ml-4 mb-2">需要消耗积分</p>
+                    <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest ml-4 mb-2">
+                      需要消耗积分
+                    </p>
                     <Input
                       type="number"
                       placeholder="价格"
                       value={newItemPrice.toString()}
-                      onChange={(e) => setNewItemPrice(parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        setNewItemPrice(parseInt(e.target.value) || 0)
+                      }
                     />
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest ml-4">选择商品图标</p>
+                  <p className="text-xs font-bold text-on-surface-variant/60 uppercase tracking-widest ml-4">
+                    选择商品图标
+                  </p>
                   <div className="flex gap-4 justify-center">
                     {Object.keys(iconMap).map((iconKey) => {
                       const CurrentIcon = iconMap[iconKey];
@@ -370,7 +539,9 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
                           onClick={() => setNewItemIcon(iconKey)}
                           className={cn(
                             "w-14 h-14 rounded-full flex items-center justify-center transition-all",
-                            newItemIcon === iconKey ? "bg-primary text-white scale-110 shadow-lg" : "bg-surface-container-high text-on-surface-variant"
+                            newItemIcon === iconKey
+                              ? "bg-primary text-white scale-110 shadow-lg"
+                              : "bg-surface-container-high text-on-surface-variant",
                           )}
                         >
                           <CurrentIcon size={24} />
@@ -381,8 +552,17 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <button className="flex-1 font-bold py-3 rounded-full bg-surface-container hover:bg-surface-variant transition-colors" onClick={() => setIsAdding(false)}>取消</button>
-                  <button className="flex-1 font-bold py-3 rounded-full bg-primary text-white hover:opacity-90 disabled:opacity-50 transition-colors" onClick={handleAddItem} disabled={!newItemName || newItemPrice <= 0}>
+                  <button
+                    className="flex-1 font-bold py-3 rounded-full bg-surface-container hover:bg-surface-variant transition-colors"
+                    onClick={() => setIsAdding(false)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="flex-1 font-bold py-3 rounded-full bg-primary text-white hover:opacity-90 disabled:opacity-50 transition-colors"
+                    onClick={handleAddItem}
+                    disabled={!newItemName || newItemPrice <= 0}
+                  >
                     上架商品
                   </button>
                 </div>
@@ -396,11 +576,11 @@ export const Store = ({ userPoints = 0, role = 'child', onPurchase }: StoreProps
         isOpen={!!confirmConfig}
         onClose={() => setConfirmConfig(null)}
         onConfirm={() => confirmConfig?.onConfirm()}
-        title={confirmConfig?.title || '确认操作'}
-        message={confirmConfig?.message || '确认执行此操作吗？'}
+        title={confirmConfig?.title || "确认操作"}
+        message={confirmConfig?.message || "确认执行此操作吗？"}
         confirmText="确定"
         cancelText="取消"
-        type={confirmConfig?.type || 'info'}
+        type={confirmConfig?.type || "info"}
       />
     </div>
   );
